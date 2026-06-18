@@ -1,0 +1,19 @@
+# Sistema
+Thumbs.db
+Desktop.ini
+
+# Entornos y dependencias
+node_modules/
+.venv/
+venv/
+env/
+
+# Archivos temporales
+*.log
+*.tmp
+*.bak
+
+# Configuracion local
+.env
+.env.local
+
