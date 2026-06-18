@@ -202,6 +202,7 @@ model BankAccount {
   updatedAt     DateTime  @updatedAt
 
   company         Company          @relation(fields: [companyId], references: [id])
+  movements       Movement[]
   openingBalances OpeningBalance[]
   payments        Payment[]
 
@@ -234,6 +235,7 @@ model Movement {
   companyId           String
   businessUnitId      String
   accountingAccountId String
+  bankAccountId       String
   projectId           String?
   costCenterId        String?
   type                MovementType
@@ -243,12 +245,14 @@ model Movement {
   currency            Currency       @default(CLP)
   projectedDate       DateTime
   realDate            DateTime?
+  notes               String?
   cancelledAt         DateTime?
   deletedAt           DateTime?
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 
   accountingAccount AccountingAccount @relation(fields: [accountingAccountId], references: [id])
+  bankAccount       BankAccount       @relation(fields: [bankAccountId], references: [id])
   businessUnit      BusinessUnit      @relation(fields: [businessUnitId], references: [id])
   company           Company           @relation(fields: [companyId], references: [id])
   costCenter        CostCenter?       @relation(fields: [costCenterId], references: [id])
@@ -256,6 +260,7 @@ model Movement {
   project           Project?          @relation(fields: [projectId], references: [id])
 
   @@index([accountingAccountId])
+  @@index([bankAccountId])
   @@index([businessUnitId])
   @@index([companyId, projectedDate])
   @@index([costCenterId])
