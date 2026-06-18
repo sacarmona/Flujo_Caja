@@ -149,3 +149,29 @@ La vista Movimientos permite registrar ingresos y egresos sin implementar todavi
 - Los permisos se validan en servidor.
 - Crear, editar y cancelar movimientos registra auditoria en `AuditLog`.
 - Cancelar un movimiento cambia su estado a `CANCELLED` y registra `cancelledAt`.
+
+## Pagos y cobros
+
+Los pagos y cobros se registran con `Payment` dentro del detalle de cada movimiento. En esta fase solo se registran pagos en `CLP`; los tipos de cambio quedan para una fase posterior.
+
+### Funciones
+
+- Registrar pago o cobro asociado a un movimiento.
+- Permitir varios pagos por movimiento.
+- Mostrar total pagado o cobrado.
+- Mostrar saldo pendiente.
+- Mostrar historial de pagos.
+- Anular un pago sin borrarlo fisicamente.
+
+### Reglas
+
+- El monto del pago debe ser positivo.
+- No se permiten pagos superiores al saldo pendiente.
+- Sin pagos activos, el movimiento queda `PENDING`.
+- Con pago parcial, el movimiento queda `PARTIALLY_PAID`.
+- Con pago completo, el movimiento queda `PAID_OR_COLLECTED`.
+- Al completar el pago se registra `realDate` del movimiento si aun no existe.
+- Registrar o anular pagos usa transacciones de base de datos.
+- Registrar o anular pagos se audita en `AuditLog`.
+- Los permisos se validan en servidor.
+- `READ_ONLY` no puede registrar ni anular pagos.

@@ -275,6 +275,8 @@ model Payment {
   currency      Currency  @default(CLP)
   paidAt        DateTime
   reference     String?
+  cancelledAt   DateTime?
+  cancelReason  String?
   deletedAt     DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
