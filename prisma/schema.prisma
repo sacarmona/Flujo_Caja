@@ -243,6 +243,12 @@ model Movement {
   description         String
   amount              Decimal        @db.Decimal(14, 2)
   currency            Currency       @default(CLP)
+  conversionDate      DateTime
+  projectedRate       Decimal        @default(1) @db.Decimal(18, 6)
+  projectedAmountClp  Decimal        @db.Decimal(14, 2)
+  exchangeRateSource  String         @default("CLP")
+  isManualRate        Boolean        @default(false)
+  manualRateReason    String?
   projectedDate       DateTime
   realDate            DateTime?
   notes               String?

@@ -1,7 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import type { Currency, MovementStatus, MovementType } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
+import { resolveConversionAllowManualFallback, type ExchangeRateProvider } from "@/lib/exchange-rates";
 import { assertCanModifyMovements, validateMovementInput, type MovementFormInput } from "@/lib/movements";
 import { getCurrentUser } from "@/lib/auth";
 import {
@@ -28,6 +31,8 @@ function formInput(formData: FormData): MovementFormInput {
     description: stringValue(formData, "description"),
     amount: stringValue(formData, "amount"),
     currency: stringValue(formData, "currency") as Currency,
+    manualRate: optionalStringValue(formData, "manualRate"),
+    manualRateReason: optionalStringValue(formData, "manualRateReason"),
     bankAccountId: stringValue(formData, "bankAccountId"),
     businessUnitId: stringValue(formData, "businessUnitId"),
     projectId: optionalStringValue(formData, "projectId"),
@@ -37,6 +42,40 @@ function formInput(formData: FormData): MovementFormInput {
     status: stringValue(formData, "status") as MovementStatus,
     notes: optionalStringValue(formData, "notes")
   };
+}
+
+class DatabaseExchangeRateProvider implements ExchangeRateProvider {
+  constructor(
+    private readonly db: PrismaClient,
+    private readonly companyId: string
+  ) {}
+
+  async getRate(currency: Currency, date: Date) {
+    if (currency === "CLP") {
+      return { currency, date, rate: new Prisma.Decimal(1), source: "CLP" };
+    }
+
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
+    const rate = await this.db.exchangeRate.findFirst({
+      where: {
+        companyId: this.companyId,
+        fromCurrency: currency,
+        toCurrency: "CLP",
+        rateDate: { gte: start, lte: end },
+        deletedAt: null
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    if (!rate) {
+      throw new Error(`No hay tasa ${currency}/CLP para la fecha seleccionada.`);
+    }
+
+    return { currency, date, rate: rate.rate, source: rate.source ?? "ExchangeRate" };
+  }
 }
 
 async function requireMovementWriter() {
@@ -91,15 +130,34 @@ export async function createMovementAction(formData: FormData) {
   const user = await requireMovementWriter();
   const input = formInput(formData);
   const data = validateMovementInput(input, await references(user.companyId, input));
+  const conversion = await resolveConversionAllowManualFallback({
+    amount: data.amount,
+    currency: data.currency,
+    date: data.projectedDate,
+    manualRate: input.manualRate,
+    manualReason: input.manualRateReason,
+    provider: new DatabaseExchangeRateProvider(prisma, user.companyId)
+  });
 
   const movement = await prisma.movement.create({
     data: {
       companyId: user.companyId,
-      ...data
+      ...data,
+      ...conversion
     }
   });
 
   await audit({ companyId: user.companyId, userId: user.id, entityId: movement.id, action: "CREATE", after: movement });
+  if (conversion.isManualRate) {
+    await audit({
+      companyId: user.companyId,
+      userId: user.id,
+      entityId: movement.id,
+      action: "UPDATE",
+      before: null,
+      after: conversion
+    });
+  }
   revalidatePath("/app/movimientos");
 }
 
@@ -118,12 +176,39 @@ export async function updateMovementAction(formData: FormData) {
 
   const input = formInput(formData);
   const data = validateMovementInput(input, await references(user.companyId, input));
+  const conversion = await resolveConversionAllowManualFallback({
+    amount: data.amount,
+    currency: data.currency,
+    date: data.projectedDate,
+    manualRate: input.manualRate,
+    manualReason: input.manualRateReason,
+    provider: new DatabaseExchangeRateProvider(prisma, user.companyId)
+  });
   const updated = await prisma.movement.update({
     where: { id },
-    data
+    data: {
+      ...data,
+      ...conversion
+    }
   });
 
   await audit({ companyId: user.companyId, userId: user.id, entityId: id, action: "UPDATE", before: current, after: updated });
+  if (conversion.isManualRate) {
+    await audit({
+      companyId: user.companyId,
+      userId: user.id,
+      entityId: id,
+      action: "UPDATE",
+      before: {
+        projectedRate: current.projectedRate,
+        projectedAmountClp: current.projectedAmountClp,
+        exchangeRateSource: current.exchangeRateSource,
+        isManualRate: current.isManualRate,
+        manualRateReason: current.manualRateReason
+      },
+      after: conversion
+    });
+  }
   revalidatePath("/app/movimientos");
 }
 

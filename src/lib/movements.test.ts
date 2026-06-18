@@ -7,6 +7,8 @@ const baseInput = {
   description: "Servicio de inspección",
   amount: "100000",
   currency: "CLP" as const,
+  manualRate: null,
+  manualRateReason: null,
   bankAccountId: "bank",
   businessUnitId: "unit",
   projectId: null,

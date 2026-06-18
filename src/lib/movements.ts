@@ -18,6 +18,8 @@ export type MovementFormInput = {
   description: string;
   amount: string;
   currency: Currency;
+  manualRate: string | null;
+  manualRateReason: string | null;
   bankAccountId: string;
   businessUnitId: string;
   projectId: string | null;

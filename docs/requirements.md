@@ -175,3 +175,36 @@ Los pagos y cobros se registran con `Payment` dentro del detalle de cada movimie
 - Registrar o anular pagos se audita en `AuditLog`.
 - Los permisos se validan en servidor.
 - `READ_ONLY` no puede registrar ni anular pagos.
+
+## Conversion a CLP
+
+Los movimientos conservan su monto y moneda original, junto con la tasa usada para calcular el equivalente proyectado en CLP. Las tasas historicas guardadas no se recalculan automaticamente.
+
+### Monedas soportadas
+
+- `CLP`
+- `UF`
+- `EUR`
+- `USD`
+
+### Campos persistidos en movimiento
+
+- Monto original.
+- Moneda original.
+- Fecha de conversion proyectada.
+- Tipo de cambio proyectado.
+- Monto proyectado en CLP.
+- Fuente del tipo de cambio.
+- Indicador de correccion manual.
+- Motivo de correccion manual.
+
+### Reglas
+
+- `CLP` usa tasa `1`.
+- Los movimientos pendientes usan la fecha proyectada para consultar tasa.
+- Los pagos usan su fecha real; en esta fase se registran solo en `CLP` con tasa `1`.
+- La tasa puede consultarse automaticamente mediante `ExchangeRateProvider`.
+- La tasa puede corregirse manualmente cuando corresponda.
+- Si la consulta automatica falla, se permite ingreso manual.
+- Los calculos usan `Decimal`, nunca `float`.
+- Las correcciones manuales se auditan en `AuditLog`.

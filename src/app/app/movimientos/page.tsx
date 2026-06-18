@@ -174,6 +174,25 @@ function MovementForm({
           ))}
         </select>
       </label>
+      <label className="text-sm">
+        <span className="mb-1 block text-slate-600">Tasa manual</span>
+        <input
+          className="w-full rounded-md border border-slate-300 px-2 py-2"
+          min="0.000001"
+          name="manualRate"
+          step="0.000001"
+          type="number"
+          defaultValue={movement?.isManualRate ? movement.projectedRate.toString() : ""}
+        />
+      </label>
+      <label className="text-sm md:col-span-3">
+        <span className="mb-1 block text-slate-600">Motivo correccion</span>
+        <input
+          className="w-full rounded-md border border-slate-300 px-2 py-2"
+          name="manualRateReason"
+          defaultValue={movement?.manualRateReason ?? ""}
+        />
+      </label>
       <label className="text-sm md:col-span-2">
         <span className="mb-1 block text-slate-600">Cuenta bancaria</span>
         <select
@@ -383,7 +402,7 @@ function PaymentPanel({
                     {formatCurrency(Number(payment.amount))} · {formatDate(payment.paidAt)}
                   </p>
                   <p className="text-xs text-slate-500">
-                    {payment.bankAccount.name}
+                    {payment.bankAccount.name} · CLP tasa 1
                     {payment.reference ? ` · Ref. ${payment.reference}` : ""}
                     {payment.cancelledAt ? ` · Anulado ${formatDate(payment.cancelledAt)}` : ""}
                   </p>
@@ -546,6 +565,13 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
                 <div className="text-right">
                   <p className="text-lg font-semibold text-adentu-ink">
                     {formatAmount(movement.amount, movement.currency)}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Tasa {movement.projectedRate.toString()} · CLP {formatCurrency(Number(movement.projectedAmountClp))}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {movement.exchangeRateSource}
+                    {movement.isManualRate ? ` · Manual: ${movement.manualRateReason ?? "sin motivo"}` : ""}
                   </p>
                   {movement.cancelledAt ? <p className="text-xs text-slate-500">Cancelado {formatDate(movement.cancelledAt)}</p> : null}
                 </div>
