@@ -299,3 +299,34 @@ El sistema debe contar con servicios para calcular flujo de caja diario sin cons
 - Estado.
 - Tipo ingreso/egreso.
 - Moneda.
+
+## Calendario
+
+La pagina Calendario presenta el flujo de caja por dia habil usando el motor `cash-flow`; no duplica calculos ni consulta datos por celda.
+
+### Funciones
+
+- Horizonte inicial de 3 meses.
+- Selector de 3, 6, 9 y 12 meses.
+- Solo columnas de dias habiles.
+- Separacion visual por semanas con semana iniciando lunes.
+- Encabezados de fecha fijos.
+- Primera columna fija.
+- Desplazamiento horizontal.
+- Filas jerarquicas contraibles por categoria y cuenta contable.
+- Filas resumen: total ingresos, total egresos, flujo neto y saldo acumulado.
+- Modos: proyectado, real y comparacion.
+- Celdas enlazan a Movimientos filtrados por fecha y cuenta.
+- No se permite edicion directa desde calendario.
+
+### Senales visuales
+
+- Montos en formato CLP.
+- Ingresos, egresos, saldos y alertas usan icono y texto/tooltip, no solo color.
+- Pendientes y pagados se reflejan mediante el modo proyectado/real.
+
+### Rendimiento
+
+- Una carga agregada por rango y filtros.
+- Sin consultas por celda.
+- Tabla con desplazamiento horizontal; virtualizacion queda reservada si el volumen lo exige.
