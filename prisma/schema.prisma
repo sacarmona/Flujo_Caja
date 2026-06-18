@@ -1,0 +1,591 @@
+// Esquema de datos — Flujo de Caja ADENTU Ingeniería SpA
+// Ver docs/architecture.md para el diagrama y las decisiones de diseño.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Empresa y usuarios
+// ---------------------------------------------------------------------------
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  rut       String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  businessUnits BusinessUnit[]
+  bankAccounts  BankAccount[]
+  accounts      Account[]
+  projects      Project[]
+  costCenters   CostCenter[]
+  counterparties Counterparty[]
+  movements     Movement[]
+  recurrences   RecurrenceRule[]
+  importBatches BankImportBatch[]
+
+  @@map("companies")
+}
+
+enum Role {
+  ADMIN
+  FINANCE
+  MOVEMENT_ENTRY
+  READ_ONLY
+}
+
+model User {
+  id            String    @id @default(cuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id])
+  name          String
+  email         String    @unique
+  passwordHash  String
+  role          Role
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  movementsCreated   Movement[]        @relation("MovementCreatedBy")
+  paymentsCreated    Payment[]         @relation("PaymentCreatedBy")
+  auditLogs          AuditLog[]
+  attachmentsUploaded Attachment[]     @relation("AttachmentUploadedBy")
+  initialBalances    InitialBalance[]
+  reconciliations    Reconciliation[]  @relation("ReconciliationConfirmedBy")
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Unidades de negocio, proyectos, centros de costo, terceros
+// ---------------------------------------------------------------------------
+
+model BusinessUnit {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects  Project[]
+  movements Movement[]
+  recurrences RecurrenceRule[]
+
+  @@unique([companyId, name])
+  @@map("business_units")
+}
+
+model Project {
+  id             String       @id @default(cuid())
+  companyId      String
+  company        Company      @relation(fields: [companyId], references: [id])
+  businessUnitId String
+  businessUnit   BusinessUnit @relation(fields: [businessUnitId], references: [id])
+  name           String
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  movements   Movement[]
+  recurrences RecurrenceRule[]
+
+  @@map("projects")
+}
+
+model CostCenter {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movements   Movement[]
+  recurrences RecurrenceRule[]
+
+  @@unique([companyId, name])
+  @@map("cost_centers")
+}
+
+model Counterparty {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  name      String
+  taxId     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movements Movement[]
+
+  @@map("counterparties")
+}
+
+// ---------------------------------------------------------------------------
+// Cuentas bancarias y saldo inicial
+// ---------------------------------------------------------------------------
+
+model BankAccount {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  name        String
+  currency    Currency @default(CLP)
+  active      Boolean  @default(true)
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  movements        Movement[]
+  payments         Payment[]
+  initialBalances  InitialBalance[]
+  recurrences      RecurrenceRule[]
+  importBatches    BankImportBatch[]
+  bankMovements    BankMovement[]
+
+  @@map("bank_accounts")
+}
+
+model InitialBalance {
+  id            String      @id @default(cuid())
+  bankAccountId String
+  bankAccount   BankAccount @relation(fields: [bankAccountId], references: [id])
+  date          DateTime    @db.Date
+  amount        Decimal     @db.Decimal(18, 2)
+  currency      Currency
+  note          String?
+  createdById   String
+  createdBy     User        @relation(fields: [createdById], references: [id])
+  createdAt     DateTime    @default(now())
+
+  @@map("initial_balances")
+}
+
+// ---------------------------------------------------------------------------
+// Monedas y tipo de cambio
+// ---------------------------------------------------------------------------
+
+enum Currency {
+  CLP
+  UF
+  EUR
+  USD
+}
+
+enum ExchangeRateSource {
+  MINDICADOR
+  MANUAL
+}
+
+model ExchangeRate {
+  id          String              @id @default(cuid())
+  currency    Currency
+  date        DateTime            @db.Date
+  value       Decimal             @db.Decimal(18, 6)
+  source      ExchangeRateSource
+  isManualOverride Boolean        @default(false)
+  overrideReason   String?
+  createdAt   DateTime            @default(now())
+
+  @@unique([currency, date, source])
+  @@map("exchange_rates")
+}
+
+// ---------------------------------------------------------------------------
+// Plan de cuentas
+// ---------------------------------------------------------------------------
+
+enum AccountType {
+  INGRESO
+  COSTO_DIRECTO
+  GASTO_ADMINISTRATIVO
+  IMPUESTO
+  FINANCIAMIENTO
+  INVERSION
+  NO_OPERACIONAL
+}
+
+model Account {
+  id               String      @id @default(cuid())
+  companyId        String
+  company          Company     @relation(fields: [companyId], references: [id])
+  code             String
+  name             String
+  parentId         String?
+  parent           Account?    @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children         Account[]   @relation("AccountHierarchy")
+  type             AccountType
+  order            Int         @default(0)
+  level            Int         @default(0)
+  active           Boolean     @default(true)
+  allowsMovements  Boolean     @default(true)
+  flowClassification String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  movements   Movement[]
+  recurrences RecurrenceRule[]
+
+  @@unique([companyId, code])
+  @@map("accounts")
+}
+
+// ---------------------------------------------------------------------------
+// Movimientos
+// ---------------------------------------------------------------------------
+
+enum MovementType {
+  INGRESO
+  EGRESO
+}
+
+enum MovementStatus {
+  PROJECTED
+  PENDING
+  PAID_OR_COLLECTED
+  OVERDUE
+  CANCELLED
+}
+
+enum MovementOrigin {
+  MANUAL
+  RECURRENCE
+  EXCEL_IMPORT
+  BANK_IMPORT
+  RECONCILIATION
+}
+
+model Movement {
+  id              String          @id @default(cuid())
+  companyId       String
+  company         Company         @relation(fields: [companyId], references: [id])
+  type            MovementType
+  accountId       String
+  account         Account         @relation(fields: [accountId], references: [id])
+  description     String
+  grossAmount     Decimal         @db.Decimal(18, 2)
+  currency        Currency
+  amountCLP       Decimal         @db.Decimal(18, 2)
+
+  // Detalle de moneda distinta de CLP
+  originalCurrency        Currency?
+  originalAmount          Decimal?  @db.Decimal(18, 2)
+  projectedRateDate       DateTime? @db.Date
+  projectedRateValue      Decimal?  @db.Decimal(18, 6)
+  projectedAmountCLP      Decimal?  @db.Decimal(18, 2)
+  actualRateDate          DateTime? @db.Date
+  actualRateValue         Decimal?  @db.Decimal(18, 6)
+  actualAmountCLP         Decimal?  @db.Decimal(18, 2)
+  rateSource              ExchangeRateSource?
+  rateManualOverride      Boolean   @default(false)
+  rateManualOverrideReason String?
+
+  netAmount   Decimal? @db.Decimal(18, 2)
+  vatAmount   Decimal? @db.Decimal(18, 2)
+  withholdingAmount Decimal? @db.Decimal(18, 2)
+
+  bankAccountId   String
+  bankAccount     BankAccount     @relation(fields: [bankAccountId], references: [id])
+  businessUnitId  String
+  businessUnit    BusinessUnit    @relation(fields: [businessUnitId], references: [id])
+  projectId       String?
+  project         Project?        @relation(fields: [projectId], references: [id])
+  costCenterId    String?
+  costCenter      CostCenter?     @relation(fields: [costCenterId], references: [id])
+  counterpartyId  String?
+  counterparty    Counterparty?   @relation(fields: [counterpartyId], references: [id])
+
+  projectedDate   DateTime        @db.Date
+  actualDate      DateTime?       @db.Date
+  status          MovementStatus  @default(PROJECTED)
+  origin          MovementOrigin  @default(MANUAL)
+  notes           String?
+
+  recurrenceRuleId       String?
+  recurrenceRule         RecurrenceRule?       @relation(fields: [recurrenceRuleId], references: [id])
+  recurrenceOccurrence   RecurrenceOccurrence?
+
+  createdById String
+  createdBy   User     @relation("MovementCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  payments     Payment[]
+  attachments  Attachment[]
+  reconciliations Reconciliation[]
+
+  @@index([companyId, projectedDate])
+  @@index([companyId, status])
+  @@index([businessUnitId])
+  @@index([accountId])
+  @@map("movements")
+}
+
+// ---------------------------------------------------------------------------
+// Pagos / cobros parciales
+// ---------------------------------------------------------------------------
+
+model Payment {
+  id              String       @id @default(cuid())
+  movementId      String
+  movement        Movement     @relation(fields: [movementId], references: [id])
+  date            DateTime     @db.Date
+  originalAmount  Decimal      @db.Decimal(18, 2)
+  currency        Currency
+  rateValue       Decimal?     @db.Decimal(18, 6)
+  amountCLP       Decimal      @db.Decimal(18, 2)
+  bankAccountId   String
+  bankAccount     BankAccount  @relation(fields: [bankAccountId], references: [id])
+  bankReference   String?
+  origin          MovementOrigin @default(MANUAL)
+  note            String?
+  createdById     String
+  createdBy       User         @relation("PaymentCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime     @default(now())
+
+  attachments     Attachment[]
+  reconciliation  Reconciliation?
+
+  @@index([movementId])
+  @@map("payments")
+}
+
+// ---------------------------------------------------------------------------
+// Recurrencias
+// ---------------------------------------------------------------------------
+
+enum RecurrenceFrequency {
+  DAILY
+  EVERY_N_DAYS
+  BUSINESS_DAYS
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+}
+
+enum NonBusinessDayAdjustment {
+  NEXT_BUSINESS_DAY
+}
+
+model RecurrenceRule {
+  id              String              @id @default(cuid())
+  companyId       String
+  company         Company             @relation(fields: [companyId], references: [id])
+  type            MovementType
+  accountId       String
+  account         Account             @relation(fields: [accountId], references: [id])
+  description     String
+  baseAmount      Decimal             @db.Decimal(18, 2)
+  currency        Currency
+  bankAccountId   String
+  bankAccount     BankAccount         @relation(fields: [bankAccountId], references: [id])
+  businessUnitId  String
+  businessUnit    BusinessUnit        @relation(fields: [businessUnitId], references: [id])
+  projectId       String?
+  project         Project?            @relation(fields: [projectId], references: [id])
+  costCenterId    String?
+  costCenter      CostCenter?         @relation(fields: [costCenterId], references: [id])
+
+  startDate       DateTime            @db.Date
+  endDate         DateTime?           @db.Date
+  frequency       RecurrenceFrequency
+  interval        Int                 @default(1)
+  weekDays        Int[]               @default([])
+  dayOfMonth      Int?
+  initialStatus   MovementStatus      @default(PROJECTED)
+  notes           String?
+  active          Boolean             @default(true)
+  adjustment      NonBusinessDayAdjustment @default(NEXT_BUSINESS_DAY)
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  occurrences     RecurrenceOccurrence[]
+  movements       Movement[]
+
+  @@map("recurrence_rules")
+}
+
+// Una ocurrencia generada por la regla. idempotencyKey evita duplicados.
+model RecurrenceOccurrence {
+  id               String         @id @default(cuid())
+  recurrenceRuleId String
+  recurrenceRule   RecurrenceRule @relation(fields: [recurrenceRuleId], references: [id])
+  scheduledDate    DateTime       @db.Date
+  idempotencyKey   String         @unique
+  baseAmount       Decimal        @db.Decimal(18, 2)
+  computedAmount   Decimal        @db.Decimal(18, 2)
+  manualAdjustment Decimal?       @db.Decimal(18, 2)
+  finalAmount      Decimal        @db.Decimal(18, 2)
+  movementId       String?        @unique
+  movement         Movement?      @relation(fields: [movementId], references: [id])
+  createdAt        DateTime       @default(now())
+
+  @@index([recurrenceRuleId, scheduledDate])
+  @@map("recurrence_occurrences")
+}
+
+// ---------------------------------------------------------------------------
+// Feriados / calendario de negocio
+// ---------------------------------------------------------------------------
+
+model Holiday {
+  id        String   @id @default(cuid())
+  date      DateTime @db.Date
+  name      String
+  isManual  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([date])
+  @@map("holidays")
+}
+
+// ---------------------------------------------------------------------------
+// Importación de cartolas y conciliación
+// ---------------------------------------------------------------------------
+
+enum ImportBatchStatus {
+  UPLOADED
+  MAPPED
+  PROCESSED
+  FAILED
+}
+
+model BankImportBatch {
+  id            String            @id @default(cuid())
+  companyId     String
+  company       Company           @relation(fields: [companyId], references: [id])
+  bankAccountId String
+  bankAccount   BankAccount       @relation(fields: [bankAccountId], references: [id])
+  fileName      String
+  status        ImportBatchStatus @default(UPLOADED)
+  uploadedAt    DateTime          @default(now())
+
+  rawRows        BankImportRow[]
+  bankMovements  BankMovement[]
+
+  @@map("bank_import_batches")
+}
+
+model BankImportRow {
+  id            String           @id @default(cuid())
+  batchId       String
+  batch         BankImportBatch  @relation(fields: [batchId], references: [id])
+  rowNumber     Int
+  rawData       Json
+  normalizedData Json?
+  error         String?
+  createdAt     DateTime         @default(now())
+
+  @@map("bank_import_rows")
+}
+
+enum BankMovementType {
+  CARGO
+  ABONO
+}
+
+model BankMovement {
+  id              String           @id @default(cuid())
+  batchId         String
+  batch           BankImportBatch  @relation(fields: [batchId], references: [id])
+  bankAccountId   String
+  bankAccount     BankAccount      @relation(fields: [bankAccountId], references: [id])
+  date            DateTime         @db.Date
+  amount          Decimal          @db.Decimal(18, 2)
+  type            BankMovementType
+  description     String
+  normalizedDescription String?
+  reference       String?
+  createdAt       DateTime         @default(now())
+
+  reconciliation  Reconciliation?
+
+  @@map("bank_movements")
+}
+
+enum ReconciliationMatchLevel {
+  HIGH
+  POSSIBLE
+  NONE
+}
+
+model Reconciliation {
+  id              String                   @id @default(cuid())
+  bankMovementId  String                   @unique
+  bankMovement    BankMovement             @relation(fields: [bankMovementId], references: [id])
+  movementId      String?
+  movement        Movement?                @relation(fields: [movementId], references: [id])
+  paymentId       String?                  @unique
+  payment         Payment?                 @relation(fields: [paymentId], references: [id])
+  matchLevel      ReconciliationMatchLevel
+  confirmed       Boolean                  @default(false)
+  confirmedById   String?
+  confirmedBy     User?                    @relation("ReconciliationConfirmedBy", fields: [confirmedById], references: [id])
+  confirmedAt     DateTime?
+  reversed        Boolean                  @default(false)
+  reversedAt      DateTime?
+  reversalReason  String?
+  createdAt       DateTime                 @default(now())
+
+  @@map("reconciliations")
+}
+
+// ---------------------------------------------------------------------------
+// Documentos adjuntos
+// ---------------------------------------------------------------------------
+
+model Attachment {
+  id           String    @id @default(cuid())
+  movementId   String?
+  movement     Movement? @relation(fields: [movementId], references: [id])
+  paymentId    String?
+  payment      Payment?  @relation(fields: [paymentId], references: [id])
+  originalName String
+  storageKey   String
+  mimeType     String
+  sizeBytes    Int
+  uploadedById String
+  uploadedBy   User      @relation("AttachmentUploadedBy", fields: [uploadedById], references: [id])
+  uploadedAt   DateTime  @default(now())
+
+  @@map("attachments")
+}
+
+// ---------------------------------------------------------------------------
+// Auditoría
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entity     String
+  entityId   String
+  action     String
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  occurredAt DateTime @default(now())
+  field      String?
+  oldValue   String?
+  newValue   String?
+  reason     String?
+  ipAddress  String?
+  sessionInfo String?
+
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}
