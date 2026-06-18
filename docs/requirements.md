@@ -258,3 +258,44 @@ Los movimientos conservan su monto y moneda original, junto con la tasa usada pa
 - La vista previa muestra las proximas 10 ocurrencias e indica cuando una fecha fue movida por fin de semana o feriado.
 - Desactivar requiere confirmacion y conserva historial.
 - Crear, editar, desactivar y generar se auditan en `AuditLog`.
+
+## Flujo de caja por dia habil
+
+El sistema debe contar con servicios para calcular flujo de caja diario sin construir todavia la grilla visual del calendario.
+
+### Calculos
+
+- Saldo inicial.
+- Ingresos proyectados.
+- Egresos proyectados.
+- Ingresos reales.
+- Egresos reales.
+- Flujo neto diario.
+- Saldo acumulado diario.
+- Totales semanales.
+
+### Agrupaciones
+
+- Categoria contable.
+- Cuenta contable.
+- Unidad de negocio.
+
+### Reglas
+
+- Horizonte inicial de 3 meses.
+- Rango maximo de 12 meses.
+- Solo dias habiles.
+- La semana comienza el lunes.
+- Movimientos pendientes usan `projectedAmountClp`.
+- Movimientos pagados usan pagos reales en CLP.
+- No debe existir doble conteo entre movimiento proyectado y pagos reales.
+- Debe incluir saldo inicial de Cuenta Corriente Santander.
+- Los calculos usan `Decimal`, nunca `float`.
+
+### Filtros
+
+- Unidad de negocio.
+- Cuenta contable.
+- Estado.
+- Tipo ingreso/egreso.
+- Moneda.
