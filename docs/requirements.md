@@ -208,3 +208,48 @@ Los movimientos conservan su monto y moneda original, junto con la tasa usada pa
 - Si la consulta automatica falla, se permite ingreso manual.
 - Los calculos usan `Decimal`, nunca `float`.
 - Las correcciones manuales se auditan en `AuditLog`.
+
+## Recurrencias
+
+`RecurrenceRule` define plantillas para generar movimientos proyectados automaticamente. En esta fase se implementan motor y servicios; la interfaz completa queda para una etapa posterior.
+
+### Frecuencias
+
+- `DAILY`: diaria.
+- `BUSINESS_DAYS`: dias habiles.
+- `EVERY_N_DAYS`: cada N dias.
+- `WEEKLY`: semanal.
+- `BIWEEKLY`: quincenal.
+- `MONTHLY`: mensual.
+- `QUARTERLY`: trimestral.
+- `SEMIANNUAL`: semestral.
+- `ANNUAL`: anual.
+
+### Campos
+
+- Cuenta contable.
+- Descripcion.
+- Monto.
+- Moneda.
+- Banco.
+- Unidad de negocio.
+- Proyecto opcional.
+- Centro de costo opcional.
+- Frecuencia.
+- Fecha de inicio.
+- Fecha de termino opcional.
+- Estado.
+- Notas.
+
+### Reglas
+
+- Excluir sabados, domingos y feriados.
+- Mover fechas no habiles al dia habil siguiente.
+- Si el dia 29, 30 o 31 no existe, usar el ultimo dia del mes.
+- Permitir fecha de inicio y termino.
+- Generar inicialmente 12 meses.
+- Evitar movimientos duplicados por recurrencia y fecha nominal de ocurrencia.
+- Cada movimiento generado mantiene `recurrenceRuleId` y `recurrenceOccurrenceDate`.
+- Al desactivar una recurrencia, se conserva el historial de movimientos.
+- Se permite editar una sola ocurrencia modificando el movimiento generado.
+- Queda preparada la opcion `THIS_AND_FOLLOWING` para esta y las siguientes, sin modificar movimientos historicos en esta fase.
