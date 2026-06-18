@@ -211,7 +211,7 @@ Los movimientos conservan su monto y moneda original, junto con la tasa usada pa
 
 ## Recurrencias
 
-`RecurrenceRule` define plantillas para generar movimientos proyectados automaticamente. En esta fase se implementan motor y servicios; la interfaz completa queda para una etapa posterior.
+`RecurrenceRule` define plantillas para generar movimientos proyectados automaticamente.
 
 ### Frecuencias
 
@@ -253,3 +253,8 @@ Los movimientos conservan su monto y moneda original, junto con la tasa usada pa
 - Al desactivar una recurrencia, se conserva el historial de movimientos.
 - Se permite editar una sola ocurrencia modificando el movimiento generado.
 - Queda preparada la opcion `THIS_AND_FOLLOWING` para esta y las siguientes, sin modificar movimientos historicos en esta fase.
+- Solo `ADMIN` y `FINANCE` administran recurrencias.
+- La pagina Recurrentes permite listar, filtrar, crear, editar, activar, desactivar y generar movimientos de los proximos 12 meses.
+- La vista previa muestra las proximas 10 ocurrencias e indica cuando una fecha fue movida por fin de semana o feriado.
+- Desactivar requiere confirmacion y conserva historial.
+- Crear, editar, desactivar y generar se auditan en `AuditLog`.

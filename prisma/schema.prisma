@@ -310,6 +310,8 @@ model RecurrenceRule {
   currency            Currency            @default(CLP)
   frequency           RecurrenceFrequency
   intervalDays        Int?
+  dayOfMonth          Int?
+  dayOfWeek           Int?
   startDate           DateTime
   endDate             DateTime?
   status              MovementStatus      @default(PROJECTED)

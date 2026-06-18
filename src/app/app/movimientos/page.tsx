@@ -38,6 +38,7 @@ type SearchParams = {
   type?: MovementType;
   accountingAccountId?: string;
   businessUnitId?: string;
+  recurrenceRuleId?: string;
 };
 
 type MovimientosPageProps = {
@@ -290,6 +291,7 @@ async function getMovements(companyId: string, filters: SearchParams) {
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.accountingAccountId ? { accountingAccountId: filters.accountingAccountId } : {}),
     ...(filters.businessUnitId ? { businessUnitId: filters.businessUnitId } : {}),
+    ...(filters.recurrenceRuleId ? { recurrenceRuleId: filters.recurrenceRuleId } : {}),
     ...(filters.from || filters.to
       ? {
           projectedDate: {
