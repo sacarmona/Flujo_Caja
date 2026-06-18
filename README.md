@@ -57,3 +57,4 @@ npm run build
 - Moneda base: `CLP`.
 - Monedas permitidas: `CLP`, `UF`, `EUR`, `USD`.
 - Roles: `ADMIN`, `FINANCE`, `MOVEMENT_ENTRY`, `READ_ONLY`.
+- Plan de cuentas jerarquico editable por `ADMIN`.

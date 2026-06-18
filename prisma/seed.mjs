@@ -1,9 +1,43 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { accountingPlan } from "./accounting-plan.mjs";
 
 const prisma = new PrismaClient();
 
 const companyName = "ADENTU Ingenier\u00eda SpA";
 const businessUnits = ["Inspecciones", "TVM", "Saesa", "Plataforma", "Casa Matriz", "Sin asignar"];
+
+async function upsertAccountingAccount(companyId, account, parent = null, level = 1) {
+  const saved = await prisma.accountingAccount.upsert({
+    where: { companyId_code: { companyId, code: account.code } },
+    update: {
+      parentId: parent?.id ?? null,
+      name: account.name,
+      type: account.type ?? parent.type,
+      sortOrder: account.sortOrder,
+      level,
+      isActive: true,
+      allowMovements: !account.children?.length,
+      deletedAt: null
+    },
+    create: {
+      companyId,
+      parentId: parent?.id ?? null,
+      code: account.code,
+      name: account.name,
+      type: account.type ?? parent.type,
+      sortOrder: account.sortOrder,
+      level,
+      isActive: true,
+      allowMovements: !account.children?.length
+    }
+  });
+
+  for (const child of account.children ?? []) {
+    await upsertAccountingAccount(companyId, child, saved, level + 1);
+  }
+
+  return saved;
+}
 
 async function main() {
   const company = await prisma.company.upsert({
@@ -46,6 +80,10 @@ async function main() {
   });
 
   const openingBalance = process.env.OPENING_BALANCE_CLP?.trim();
+
+  for (const account of accountingPlan) {
+    await upsertAccountingAccount(company.id, account);
+  }
 
   if (openingBalance) {
     const balanceDate = new Date(process.env.OPENING_BALANCE_DATE ?? "2026-01-01");

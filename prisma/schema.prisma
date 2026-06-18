@@ -44,6 +44,16 @@ enum AuditAction {
   LOGOUT
 }
 
+enum AccountingAccountType {
+  INCOME
+  DIRECT_COST
+  ADMIN_EXPENSE
+  TAX
+  FINANCING
+  INVESTMENT
+  NON_OPERATIONAL
+}
+
 model Company {
   id           String   @id @default(cuid())
   name         String   @unique
@@ -155,20 +165,28 @@ model CostCenter {
 }
 
 model AccountingAccount {
-  id        String    @id @default(cuid())
-  companyId String
-  code      String
-  name      String
-  isActive  Boolean   @default(true)
-  deletedAt DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id             String                @id @default(cuid())
+  companyId      String
+  parentId       String?
+  code           String
+  name           String
+  type           AccountingAccountType
+  sortOrder      Int                   @default(0)
+  level          Int                   @default(1)
+  isActive       Boolean               @default(true)
+  allowMovements Boolean               @default(true)
+  deletedAt      DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
 
-  company   Company    @relation(fields: [companyId], references: [id])
+  children  AccountingAccount[] @relation("AccountingAccountHierarchy")
+  company   Company             @relation(fields: [companyId], references: [id])
   movements Movement[]
+  parent    AccountingAccount?  @relation("AccountingAccountHierarchy", fields: [parentId], references: [id])
 
   @@unique([companyId, code])
   @@index([companyId])
+  @@index([parentId])
 }
 
 model BankAccount {

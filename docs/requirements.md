@@ -68,3 +68,48 @@ Crear una aplicacion web de flujo de caja para ADENTU Ingeniería SpA, orientada
 - Se separa fecha proyectada (`projectedDate`) de fecha real (`realDate`).
 - Los pagos parciales se registran con `Payment`.
 - Los datos financieros no se eliminan fisicamente; se marcan con campos como `deletedAt`, `cancelledAt` o estados de cancelacion.
+
+## Plan de cuentas
+
+`AccountingAccount` representa un plan de cuentas jerarquico editable desde Configuracion.
+
+### Campos
+
+- Codigo unico por empresa.
+- Nombre.
+- Cuenta padre opcional.
+- Tipo.
+- Orden.
+- Nivel.
+- Activa.
+- Permite movimientos.
+
+### Tipos principales
+
+- `INCOME`: Ingresos.
+- `DIRECT_COST`: Costos directos.
+- `ADMIN_EXPENSE`: Gastos administrativos.
+- `TAX`: Impuestos.
+- `FINANCING`: Financiamiento.
+- `INVESTMENT`: Inversiones.
+- `NON_OPERATIONAL`: Movimientos no operacionales.
+
+### Plan inicial
+
+- Ingresos: Servicios de inspeccion, Servicios de ingenieria, Arriendo de equipos.
+- Costos directos: Personal de operaciones, Subcontratos, Equipos y materiales, Traslados y viaticos.
+- Gastos administrativos: Remuneraciones, Honorarios, Cotizaciones previsionales, Arriendos, Software y licencias, Contabilidad, Seguros, Gastos bancarios.
+- Impuestos: IVA y F29, PPM.
+- Financiamiento: Creditos, Intereses.
+- Inversiones: Compra de equipos.
+- Movimientos no operacionales: Aportes de socios, Retiros de socios, Ajustes no operacionales.
+
+### Reglas
+
+- Solo `ADMIN` puede crear o modificar cuentas.
+- Las cuentas padre no permiten movimientos.
+- Las cuentas con `allowMovements=false` no permiten movimientos.
+- No se permiten ciclos en la jerarquia.
+- No se permiten codigos duplicados por empresa.
+- Las cuentas usadas no se eliminan fisicamente; se desactivan.
+- Los cambios se registran en `AuditLog`.
