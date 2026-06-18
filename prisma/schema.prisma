@@ -1,0 +1,301 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  FINANCE
+  MOVEMENT_ENTRY
+  READ_ONLY
+}
+
+enum MovementType {
+  INCOME
+  EXPENSE
+}
+
+enum MovementStatus {
+  PROJECTED
+  PENDING
+  PARTIALLY_PAID
+  PAID_OR_COLLECTED
+  OVERDUE
+  CANCELLED
+}
+
+enum Currency {
+  CLP
+  UF
+  EUR
+  USD
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  CANCEL
+  SOFT_DELETE
+  LOGIN
+  LOGOUT
+}
+
+model Company {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  taxId        String?
+  locale       String   @default("es-CL")
+  timeZone     String   @default("America/Santiago")
+  baseCurrency Currency @default(CLP)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  accountingAccounts AccountingAccount[]
+  auditLogs          AuditLog[]
+  bankAccounts       BankAccount[]
+  businessUnits      BusinessUnit[]
+  costCenters        CostCenter[]
+  exchangeRates      ExchangeRate[]
+  movements          Movement[]
+  openingBalances    OpeningBalance[]
+  projects           Project[]
+  users              User[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      Role     @default(READ_ONLY)
+  companyId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company    @relation(fields: [companyId], references: [id])
+  auditLogs AuditLog[]
+  sessions  Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EmailLoginToken {
+  id        String    @id @default(cuid())
+  email     String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model BusinessUnit {
+  id        String    @id @default(cuid())
+  companyId String
+  name      String
+  code      String?
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  company   Company    @relation(fields: [companyId], references: [id])
+  movements Movement[]
+  projects  Project[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model Project {
+  id             String    @id @default(cuid())
+  companyId      String
+  businessUnitId String
+  name           String
+  code           String?
+  isActive       Boolean   @default(true)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  businessUnit BusinessUnit @relation(fields: [businessUnitId], references: [id])
+  company      Company      @relation(fields: [companyId], references: [id])
+  movements    Movement[]
+
+  @@unique([companyId, name])
+  @@index([businessUnitId])
+  @@index([companyId])
+}
+
+model CostCenter {
+  id        String    @id @default(cuid())
+  companyId String
+  name      String
+  code      String?
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  company   Company    @relation(fields: [companyId], references: [id])
+  movements Movement[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model AccountingAccount {
+  id        String    @id @default(cuid())
+  companyId String
+  code      String
+  name      String
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  company   Company    @relation(fields: [companyId], references: [id])
+  movements Movement[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+}
+
+model BankAccount {
+  id            String    @id @default(cuid())
+  companyId     String
+  name          String
+  bankName      String
+  accountNumber String?
+  currency      Currency  @default(CLP)
+  isActive      Boolean   @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  company         Company          @relation(fields: [companyId], references: [id])
+  openingBalances OpeningBalance[]
+  payments        Payment[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model OpeningBalance {
+  id            String    @id @default(cuid())
+  companyId     String
+  bankAccountId String
+  amount        Decimal   @db.Decimal(14, 2)
+  currency      Currency  @default(CLP)
+  balanceDate   DateTime
+  note          String?
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id])
+  company     Company     @relation(fields: [companyId], references: [id])
+
+  @@unique([bankAccountId, balanceDate])
+  @@index([companyId])
+  @@index([bankAccountId])
+}
+
+model Movement {
+  id                  String         @id @default(cuid())
+  companyId           String
+  businessUnitId      String
+  accountingAccountId String
+  projectId           String?
+  costCenterId        String?
+  type                MovementType
+  status              MovementStatus @default(PROJECTED)
+  description         String
+  amount              Decimal        @db.Decimal(14, 2)
+  currency            Currency       @default(CLP)
+  projectedDate       DateTime
+  realDate            DateTime?
+  cancelledAt         DateTime?
+  deletedAt           DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  accountingAccount AccountingAccount @relation(fields: [accountingAccountId], references: [id])
+  businessUnit      BusinessUnit      @relation(fields: [businessUnitId], references: [id])
+  company           Company           @relation(fields: [companyId], references: [id])
+  costCenter        CostCenter?       @relation(fields: [costCenterId], references: [id])
+  payments          Payment[]
+  project           Project?          @relation(fields: [projectId], references: [id])
+
+  @@index([accountingAccountId])
+  @@index([businessUnitId])
+  @@index([companyId, projectedDate])
+  @@index([costCenterId])
+  @@index([projectId])
+}
+
+model Payment {
+  id            String    @id @default(cuid())
+  movementId    String
+  bankAccountId String
+  amount        Decimal   @db.Decimal(14, 2)
+  currency      Currency  @default(CLP)
+  paidAt        DateTime
+  reference     String?
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id])
+  movement    Movement    @relation(fields: [movementId], references: [id])
+
+  @@index([bankAccountId])
+  @@index([movementId])
+}
+
+model ExchangeRate {
+  id           String    @id @default(cuid())
+  companyId    String
+  fromCurrency Currency
+  toCurrency   Currency
+  rate         Decimal   @db.Decimal(18, 6)
+  rateDate     DateTime
+  source       String?
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, fromCurrency, toCurrency, rateDate])
+  @@index([companyId])
+}
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  companyId String
+  userId    String?
+  entity    String
+  entityId  String
+  action    AuditAction
+  before    Json?
+  after     Json?
+  metadata  Json?
+  createdAt DateTime    @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
+
+  @@index([companyId, entity, entityId])
+  @@index([userId])
+}

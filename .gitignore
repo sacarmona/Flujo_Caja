@@ -2,8 +2,17 @@
 Thumbs.db
 Desktop.ini
 
-# Entornos y dependencias
+# Dependencias
 node_modules/
+
+# Next.js
+.next/
+out/
+
+# Prisma
+prisma/dev.db
+
+# Entornos
 .venv/
 venv/
 env/
@@ -12,8 +21,12 @@ env/
 *.log
 *.tmp
 *.bak
+coverage/
 
 # Configuracion local
 .env
 .env.local
+.env.*.local
 
+# TypeScript
+*.tsbuildinfo
