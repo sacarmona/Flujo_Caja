@@ -9,6 +9,7 @@ export type CalendarAccount = {
   name: string;
   code: string;
   parentName: string;
+  parentCode: string;
 };
 
 export type CalendarRowKind = "category" | "account" | "summary";
@@ -49,7 +50,15 @@ export function groupDaysByWeek(days: CashFlowDay[]) {
 
 export function buildCalendarRows(accounts: CalendarAccount[], collapsedCategories: Set<string> = new Set()): CalendarRow[] {
   const rows: CalendarRow[] = [];
-  const categories = [...new Set(accounts.map((account) => account.parentName))].sort((a, b) => a.localeCompare(b, "es-CL"));
+  const categoryCodes = new Map<string, string>();
+  for (const account of accounts) {
+    if (!categoryCodes.has(account.parentName)) {
+      categoryCodes.set(account.parentName, account.parentCode);
+    }
+  }
+  const categories = [...categoryCodes.keys()].sort((a, b) =>
+    categoryCodes.get(a)!.localeCompare(categoryCodes.get(b)!, "es-CL", { numeric: true })
+  );
 
   for (const category of categories) {
     rows.push({ key: `category:${category}`, label: category, kind: "category", level: 0, categoryName: category });

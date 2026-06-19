@@ -87,7 +87,7 @@ async function getReferenceData(companyId: string) {
     prisma.accountingAccount.findMany({
       where: { companyId, deletedAt: null, allowMovements: true },
       include: { parent: true },
-      orderBy: [{ sortOrder: "asc" }, { code: "asc" }]
+      orderBy: [{ code: "asc" }]
     })
   ]);
 
@@ -134,7 +134,8 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
     id: account.id,
     code: account.code,
     name: account.name,
-    parentName: account.parent?.name ?? "Sin categoria"
+    parentName: account.parent?.name ?? "Sin categoria",
+    parentCode: account.parent?.code ?? "9999"
   }));
   const rows = buildCalendarRows(accounts, collapsed);
   const weeks = groupDaysByWeek(result.days);

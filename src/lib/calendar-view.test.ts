@@ -12,8 +12,8 @@ import {
 import type { CashFlowDay } from "./cash-flow";
 
 const accounts: CalendarAccount[] = [
-  { id: "income", code: "1.01", name: "Servicios", parentName: "Ingresos" },
-  { id: "expense", code: "3.01", name: "Software", parentName: "Gastos administrativos" }
+  { id: "income", code: "1.01", name: "Servicios", parentName: "Ingresos", parentCode: "1" },
+  { id: "expense", code: "3.01", name: "Software", parentName: "Gastos administrativos", parentCode: "3" }
 ];
 
 function zero() {

@@ -13,7 +13,7 @@ async function getReferenceData(companyId: string) {
   const [accounts, businessUnits, bankAccounts, projects, costCenters] = await Promise.all([
     prisma.accountingAccount.findMany({
       where: { companyId, isActive: true, allowMovements: true, deletedAt: null, children: { none: {} } },
-      orderBy: [{ sortOrder: "asc" }, { code: "asc" }]
+      orderBy: [{ code: "asc" }]
     }),
     prisma.businessUnit.findMany({ where: { companyId, isActive: true, deletedAt: null }, orderBy: [{ name: "asc" }] }),
     prisma.bankAccount.findMany({ where: { companyId, isActive: true, deletedAt: null }, orderBy: [{ name: "asc" }] }),

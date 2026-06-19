@@ -48,7 +48,7 @@ async function getReferenceData(companyId: string) {
         deletedAt: null,
         children: { none: {} }
       },
-      orderBy: [{ sortOrder: "asc" }, { code: "asc" }]
+      orderBy: [{ code: "asc" }]
     }),
     prisma.businessUnit.findMany({
       where: { companyId, isActive: true, deletedAt: null },
