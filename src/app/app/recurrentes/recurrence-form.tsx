@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { AccountingAccountType, MovementStatus, MovementType, RecurrenceFrequency } from "@prisma/client";
+import { AmountInput } from "@/components/amount-input";
 import { accountMatchesMovementType, movementCurrencies, movementStatuses, movementTypes } from "@/lib/movements";
 import { recurrenceAmountToString, recurrenceFrequencies } from "@/lib/recurrence-rules";
 
@@ -132,14 +133,11 @@ export function RecurrenceForm({
       </label>
       <label className="text-sm">
         <span className="mb-1 block text-slate-600">Monto</span>
-        <input
+        <AmountInput
           className="w-full rounded-md border border-slate-300 px-2 py-2"
-          min="0.01"
+          defaultValue={recurrence ? recurrenceAmountToString(recurrence.amount) : ""}
           name="amount"
           required
-          step="0.01"
-          type="number"
-          defaultValue={recurrence ? recurrenceAmountToString(recurrence.amount) : ""}
         />
       </label>
       <label className="text-sm">

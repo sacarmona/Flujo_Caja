@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import { CalendarDays, Landmark, ListChecks, Repeat2, Settings, WalletCards } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CalendarDays, ChevronLeft, ChevronRight, Landmark, ListChecks, Repeat2, Settings, WalletCards } from "lucide-react";
 import { APP_COMPANY_NAME, ROLE_LABELS, type AppRole } from "@/lib/constants";
 
 const navigation = [
@@ -10,6 +13,8 @@ const navigation = [
   { href: "/app/configuracion", label: "Configuracion", icon: Settings }
 ] as const;
 
+const collapsedStorageKey = "adentu-sidebar-collapsed";
+
 type AppShellProps = {
   children: React.ReactNode;
   user: {
@@ -19,34 +24,65 @@ type AppShellProps = {
 };
 
 export function AppShell({ children, user }: AppShellProps) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    setCollapsed(window.localStorage.getItem(collapsedStorageKey) === "true");
+  }, []);
+
+  function toggleCollapsed() {
+    const next = !collapsed;
+    setCollapsed(next);
+    window.localStorage.setItem(collapsedStorageKey, String(next));
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-adentu-ink">
-      <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-200 bg-white px-5 py-6 lg:block">
+      <aside
+        className={`fixed inset-y-0 left-0 hidden flex-col border-r border-slate-200 bg-white py-6 transition-[width] lg:flex ${
+          collapsed ? "w-20 px-3" : "w-72 px-5"
+        }`}
+      >
         <Link className="flex items-center gap-3" href="/app">
-          <span className="flex size-10 items-center justify-center rounded bg-adentu-blue text-white">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded bg-adentu-blue text-white">
             <Landmark aria-hidden className="size-5" />
           </span>
-          <span>
-            <span className="block text-base font-semibold">ADENTU Cash Flow</span>
-            <span className="block text-xs text-slate-500">{APP_COMPANY_NAME}</span>
-          </span>
+          {collapsed ? null : (
+            <span>
+              <span className="block text-base font-semibold">ADENTU Cash Flow</span>
+              <span className="block text-xs text-slate-500">{APP_COMPANY_NAME}</span>
+            </span>
+          )}
         </Link>
 
-        <nav className="mt-9 space-y-1">
+        <nav className="mt-9 flex-1 space-y-1">
           {navigation.map((item) => (
             <Link
-              className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-adentu-mist hover:text-adentu-blue"
+              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-adentu-mist hover:text-adentu-blue ${
+                collapsed ? "justify-center" : ""
+              }`}
               href={item.href}
               key={item.href}
+              title={collapsed ? item.label : undefined}
             >
-              <item.icon aria-hidden className="size-4" />
-              {item.label}
+              <item.icon aria-hidden className="size-4 shrink-0" />
+              {collapsed ? null : item.label}
             </Link>
           ))}
         </nav>
+
+        <button
+          aria-label={collapsed ? "Expandir menu" : "Colapsar menu"}
+          className="flex items-center justify-center gap-2 self-stretch rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:border-adentu-blue hover:text-adentu-blue"
+          onClick={toggleCollapsed}
+          type="button"
+        >
+          {collapsed ? <ChevronRight aria-hidden className="size-4" /> : <ChevronLeft aria-hidden className="size-4" />}
+          {collapsed ? null : "Colapsar"}
+        </button>
       </aside>
 
-      <div className="lg:pl-72">
+      <div className={collapsed ? "lg:pl-20" : "lg:pl-72"}>
         <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur lg:px-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link className="flex items-center gap-2 font-semibold lg:hidden" href="/app">

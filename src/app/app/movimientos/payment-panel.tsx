@@ -1,5 +1,6 @@
 import { cancelPaymentAction, registerPaymentAction } from "@/app/app/movimientos/actions";
 import type { MovementWithRelations } from "@/app/app/movimientos/shared";
+import { AmountInput } from "@/components/amount-input";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { pendingBalance, totalPaid } from "@/lib/payments";
 
@@ -32,15 +33,7 @@ export function PaymentPanel({ canWrite, movement }: { canWrite: boolean; moveme
           <input name="movementId" type="hidden" value={movement.id} />
           <label className="text-sm">
             <span className="mb-1 block text-slate-600">Monto CLP</span>
-            <input
-              className="w-full rounded-md border border-slate-300 px-2 py-2"
-              max={pending.toString()}
-              min="0.01"
-              name="amount"
-              required
-              step="0.01"
-              type="number"
-            />
+            <AmountInput className="w-full rounded-md border border-slate-300 px-2 py-2" name="amount" required />
           </label>
           <label className="text-sm">
             <span className="mb-1 block text-slate-600">Fecha</span>

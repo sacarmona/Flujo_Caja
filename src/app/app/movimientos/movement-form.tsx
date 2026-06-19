@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { AccountingAccountType, MovementType } from "@prisma/client";
+import { AmountInput } from "@/components/amount-input";
 import { accountMatchesMovementType, movementCurrencies, movementStatuses, movementTypes } from "@/lib/movements";
 import { dateInputValue, optionLabel, statusLabels, todayInputValue, typeLabels, type MovementWithRelations } from "@/app/app/movimientos/shared";
 
@@ -85,14 +86,11 @@ export function MovementForm({
       </label>
       <label className="text-sm">
         <span className="mb-1 block text-slate-600">Monto bruto</span>
-        <input
+        <AmountInput
           className="w-full rounded-md border border-slate-300 px-2 py-2"
-          min="0.01"
+          defaultValue={movement?.amount.toString() ?? ""}
           name="amount"
           required
-          step="0.01"
-          type="number"
-          defaultValue={movement?.amount.toString() ?? ""}
         />
       </label>
       <label className="text-sm">

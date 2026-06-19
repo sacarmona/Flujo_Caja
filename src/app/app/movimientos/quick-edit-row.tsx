@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import type { MovementStatus } from "@prisma/client";
 import { quickUpdateMovementAction } from "@/app/app/movimientos/actions";
 import { dateInputValue, optionLabel, statusLabels, typeLabels, type MovementWithRelations } from "@/app/app/movimientos/shared";
+import { AmountInput } from "@/components/amount-input";
 import { formatDate } from "@/lib/format";
 
 const quickEditableStatuses = Object.keys(statusLabels).filter((status) => status !== "CANCELLED") as MovementStatus[];
@@ -12,7 +13,6 @@ const quickEditableStatuses = Object.keys(statusLabels).filter((status) => statu
 export function QuickEditRow({ canWrite, movement }: { canWrite: boolean; movement: MovementWithRelations }) {
   const [date, setDate] = useState(dateInputValue(movement.projectedDate));
   const [status, setStatus] = useState(movement.status);
-  const [amount, setAmount] = useState(movement.amount.toString());
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const editable = canWrite && movement.status !== "CANCELLED";
@@ -49,15 +49,11 @@ export function QuickEditRow({ canWrite, movement }: { canWrite: boolean; moveme
       <td className="px-3 py-2 text-sm text-slate-600">{optionLabel(movement.accountingAccount.code, movement.accountingAccount.name)}</td>
       <td className="whitespace-nowrap px-3 py-2 text-right">
         {editable ? (
-          <input
+          <AmountInput
             className="w-28 rounded-md border border-transparent px-1.5 py-1 text-right text-sm hover:border-slate-300 focus:border-adentu-blue focus:outline-none"
+            defaultValue={movement.amount.toString()}
             disabled={isPending}
-            min="0.01"
-            onBlur={(event) => event.target.value !== movement.amount.toString() && run({ amount: event.target.value })}
-            onChange={(event) => setAmount(event.target.value)}
-            step="0.01"
-            type="number"
-            value={amount}
+            onBlur={(value) => value !== movement.amount.toString() && run({ amount: value })}
           />
         ) : (
           movement.amount.toString()
