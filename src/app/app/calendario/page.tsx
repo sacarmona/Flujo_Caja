@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, CheckCircle2, CircleDot } from "lucide-react";
+import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, CheckCircle2, CircleDot, WalletCards } from "lucide-react";
 import type { Currency, MovementStatus, MovementType } from "@prisma/client";
 import { calculateSantanderCashFlow } from "@/lib/cash-flow-service";
 import {
@@ -17,7 +17,9 @@ import { formatCurrency } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { getHolidayKeys } from "@/lib/holidays-cl";
 import { movementCurrencies, movementStatuses, movementTypes } from "@/lib/movements";
+import { canManageOpeningBalances, dateInputValue, suggestedOpeningBalanceWeek } from "@/lib/opening-balances";
 import { prisma } from "@/lib/prisma";
+import { updateOpeningBalanceAction } from "./actions";
 
 type SearchParams = {
   months?: string;
@@ -139,6 +141,8 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
   }));
   const rows = buildCalendarRows(accounts, collapsed);
   const weeks = groupDaysByWeek(result.days);
+  const suggestedOpening = suggestedOpeningBalanceWeek(result, weeks);
+  const canEditOpeningBalance = canManageOpeningBalances(user.role);
 
   return (
     <section className="max-w-none">
@@ -221,6 +225,71 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
           Aplicar
         </button>
       </form>
+
+      <section className="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 lg:grid-cols-[1fr_1.4fr]">
+        <div className="flex items-start gap-3">
+          <span className="rounded-md bg-adentu-mist p-2 text-adentu-blue">
+            <WalletCards className="size-5" aria-hidden="true" />
+          </span>
+          <div>
+            <h2 className="text-sm font-semibold text-adentu-ink">Saldo inicial Santander</h2>
+            <p className="mt-1 text-2xl font-semibold text-adentu-ink">{formatCurrency(Number(result.openingBalance))}</p>
+            {suggestedOpening ? (
+              <p className="mt-1 text-xs text-slate-600">
+                Semana {dateLabel(suggestedOpening.date)} calculada en {formatCurrency(Number(suggestedOpening.amount))}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        {canEditOpeningBalance ? (
+          <div className="grid gap-3 md:grid-cols-[auto_1fr]">
+            {suggestedOpening ? (
+              <form action={updateOpeningBalanceAction} className="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="balanceDate" value={dateInputValue(suggestedOpening.date)} />
+                <input type="hidden" name="amount" value={suggestedOpening.amount.toFixed(2)} />
+                <input
+                  type="hidden"
+                  name="note"
+                  value={`Saldo confirmado desde Calendario para la semana ${dateInputValue(suggestedOpening.date)}.`}
+                />
+                <button
+                  className="rounded-md border border-adentu-blue px-3 py-2 text-sm font-semibold text-adentu-blue transition hover:bg-adentu-mist"
+                  type="submit"
+                >
+                  Confirmar calculado
+                </button>
+              </form>
+            ) : null}
+            <form action={updateOpeningBalanceAction} className="grid gap-2 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(10rem,1fr)_auto]">
+              <label className="text-sm">
+                <span className="mb-1 block text-slate-600">Fecha</span>
+                <input
+                  className="w-full rounded-md border border-slate-300 px-2 py-2"
+                  name="balanceDate"
+                  type="date"
+                  defaultValue={suggestedOpening ? dateInputValue(suggestedOpening.date) : dateInputValue(startDate)}
+                />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-slate-600">Nuevo saldo</span>
+                <input
+                  className="w-full rounded-md border border-slate-300 px-2 py-2"
+                  name="amount"
+                  inputMode="decimal"
+                  placeholder="$0"
+                />
+              </label>
+              <input type="hidden" name="note" value="Saldo inicial ingresado manualmente desde Calendario." />
+              <button className="self-end rounded-md bg-adentu-blue px-3 py-2 text-sm font-semibold text-white transition hover:bg-adentu-teal" type="submit">
+                Actualizar
+              </button>
+            </form>
+          </div>
+        ) : (
+          <p className="self-center text-sm text-slate-600">Solo ADMIN y FINANCE pueden actualizar el saldo inicial.</p>
+        )}
+      </section>
 
       <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-600">
         <span className="inline-flex items-center gap-1"><ArrowUpCircle className="size-3.5 text-adentu-teal" /> Ingresos pendientes/pagados</span>
