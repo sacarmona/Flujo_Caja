@@ -196,7 +196,7 @@ export function MovementForm({
           className="w-full rounded-md border border-slate-300 px-2 py-2"
           name="realDate"
           type="date"
-          defaultValue={movement ? dateInputValue(movement.realDate) : todayInputValue()}
+          defaultValue={dateInputValue(movement?.realDate ?? null)}
         />
       </label>
       <label className="text-sm md:col-span-2">
