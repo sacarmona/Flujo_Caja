@@ -177,10 +177,17 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
       </form>
 
       {canManage ? (
-        <div className="mt-8">
-          <h2 className="mb-3 text-lg font-semibold text-adentu-ink">Crear recurrencia</h2>
-          <RecurrenceForm action={createRecurrenceAction} defaults={defaults} referenceData={referenceData} submitLabel="Crear" />
-        </div>
+        <details className="mt-8 group">
+          <summary className="cursor-pointer list-none text-lg font-semibold text-adentu-ink">
+            <span className="inline-flex items-center gap-2">
+              <span className="text-adentu-blue transition-transform group-open:rotate-90">▶</span>
+              Crear recurrencia
+            </span>
+          </summary>
+          <div className="mt-3">
+            <RecurrenceForm action={createRecurrenceAction} defaults={defaults} referenceData={referenceData} submitLabel="Crear" />
+          </div>
+        </details>
       ) : (
         <p className="mt-8 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
           Solo ADMIN y FINANCE pueden administrar recurrencias.
