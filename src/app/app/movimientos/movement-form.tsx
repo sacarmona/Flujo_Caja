@@ -1,13 +1,21 @@
+"use client";
+
+import { useState } from "react";
+import type { AccountingAccountType, MovementType } from "@prisma/client";
 import { movementCurrencies, movementStatuses, movementTypes } from "@/lib/movements";
 import { dateInputValue, optionLabel, statusLabels, typeLabels, type MovementWithRelations } from "@/app/app/movimientos/shared";
 
 type ReferenceLists = {
-  accounts: { id: string; code: string | null; name: string }[];
+  accounts: { id: string; code: string | null; name: string; type: AccountingAccountType }[];
   bankAccounts: { id: string; name: string }[];
   businessUnits: { id: string; name: string }[];
   costCenters: { id: string; code: string | null; name: string }[];
   projects: { id: string; name: string }[];
 };
+
+function accountMatchesMovementType(accountType: AccountingAccountType, movementType: MovementType) {
+  return movementType === "INCOME" ? accountType === "INCOME" : accountType !== "INCOME";
+}
 
 export function SelectOptions<T extends string>({ values, labels }: { values: readonly T[]; labels: Record<T, string> }) {
   return values.map((value) => (
@@ -33,12 +41,23 @@ export function MovementForm({
   movement?: MovementWithRelations;
   submitLabel: string;
 }) {
+  const [type, setType] = useState<MovementType>(movement?.type ?? "INCOME");
+  const matchingAccounts = accounts.filter((account) => accountMatchesMovementType(account.type, type));
+  const currentAccountStillMatches = movement?.accountingAccountId
+    ? matchingAccounts.some((account) => account.id === movement.accountingAccountId)
+    : false;
+
   return (
     <form action={action} className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-6">
       {movement ? <input name="id" type="hidden" value={movement.id} /> : null}
       <label className="text-sm">
         <span className="mb-1 block text-slate-600">Tipo</span>
-        <select className="w-full rounded-md border border-slate-300 px-2 py-2" name="type" defaultValue={movement?.type ?? "INCOME"}>
+        <select
+          className="w-full rounded-md border border-slate-300 px-2 py-2"
+          name="type"
+          onChange={(event) => setType(event.target.value as MovementType)}
+          value={type}
+        >
           <SelectOptions labels={typeLabels} values={movementTypes} />
         </select>
       </label>
@@ -46,12 +65,13 @@ export function MovementForm({
         <span className="mb-1 block text-slate-600">Cuenta contable</span>
         <select
           className="w-full rounded-md border border-slate-300 px-2 py-2"
+          key={type}
           name="accountingAccountId"
           required
-          defaultValue={movement?.accountingAccountId ?? ""}
+          defaultValue={currentAccountStillMatches ? movement?.accountingAccountId : ""}
         >
           <option value="">Seleccionar</option>
-          {accounts.map((account) => (
+          {matchingAccounts.map((account) => (
             <option key={account.id} value={account.id}>
               {optionLabel(account.code, account.name)}
             </option>
