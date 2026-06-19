@@ -1,10 +1,18 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import { accountingPlan } from "./accounting-plan.mjs";
 
 const prisma = new PrismaClient();
 
 const companyName = "ADENTU Ingenier\u00eda SpA";
 const businessUnits = ["Inspecciones", "TVM", "Saesa", "Plataforma", "Casa Matriz", "Sin asignar"];
+
+// Usuarios de demostracion, sin contrasenas reales. La contrasena de ambos
+// es "ChangeMe123!" solo para entornos de desarrollo.
+const demoUsers = [
+  { email: "admin@adentu.cl", name: "Usuario Demo Admin", role: "ADMIN" },
+  { email: "finanzas@adentu.cl", name: "Usuario Demo Finanzas", role: "FINANCE" }
+];
 
 async function upsertAccountingAccount(companyId, account, parent = null, level = 1) {
   const saved = await prisma.accountingAccount.upsert({
@@ -60,6 +68,22 @@ async function main() {
       where: { companyId_name: { companyId: company.id, name } },
       update: { isActive: true, deletedAt: null },
       create: { companyId: company.id, name }
+    });
+  }
+
+  const passwordHash = await bcrypt.hash("ChangeMe123!", 10);
+
+  for (const demoUser of demoUsers) {
+    await prisma.user.upsert({
+      where: { email: demoUser.email },
+      update: { name: demoUser.name, role: demoUser.role, companyId: company.id },
+      create: {
+        companyId: company.id,
+        email: demoUser.email,
+        name: demoUser.name,
+        role: demoUser.role,
+        passwordHash
+      }
     });
   }
 

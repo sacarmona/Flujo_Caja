@@ -1,11 +1,17 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { requestEmailSignIn } from "@/lib/auth";
+import { signInWithPassword } from "@/lib/auth";
 
-export async function requestSignInAction(formData: FormData) {
+export async function signInAction(formData: FormData): Promise<{ error: string } | void> {
   const email = String(formData.get("email") ?? "");
-  const result = await requestEmailSignIn(email);
+  const password = String(formData.get("password") ?? "");
 
-  redirect(`/login/check-email?email=${encodeURIComponent(result.email)}&token=${encodeURIComponent(result.token)}`);
+  const ok = await signInWithPassword(email, password);
+
+  if (!ok) {
+    return { error: "Correo o contrasena incorrectos." };
+  }
+
+  redirect("/app");
 }
