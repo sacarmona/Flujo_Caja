@@ -5,7 +5,7 @@ import { Prisma } from "@prisma/client";
 import type { Currency, MovementStatus, MovementType } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 import { resolveConversionAllowManualFallback, type ExchangeRateProvider } from "@/lib/exchange-rates";
-import { assertCanModifyMovements, validateMovementInput, type MovementFormInput } from "@/lib/movements";
+import { assertCanModifyMovements, movementStatuses, validateMovementInput, type MovementFormInput } from "@/lib/movements";
 import { getCurrentUser } from "@/lib/auth";
 import {
   nextRealDateAfterPayment,
@@ -209,6 +209,55 @@ export async function updateMovementAction(formData: FormData) {
       after: conversion
     });
   }
+  revalidatePath("/app/movimientos");
+}
+
+export async function quickUpdateMovementAction(input: {
+  id: string;
+  projectedDate?: string;
+  status?: MovementStatus;
+  amount?: string;
+}) {
+  const user = await requireMovementWriter();
+  const current = await prisma.movement.findFirst({ where: { id: input.id, companyId: user.companyId, deletedAt: null } });
+
+  if (!current) {
+    throw new Error("El movimiento no existe.");
+  }
+
+  if (current.status === "CANCELLED") {
+    throw new Error("No se puede editar un movimiento cancelado.");
+  }
+
+  const data: Prisma.MovementUpdateInput = {};
+
+  if (input.projectedDate !== undefined) {
+    const projectedDate = new Date(`${input.projectedDate}T00:00:00.000`);
+    if (Number.isNaN(projectedDate.getTime())) {
+      throw new Error("La fecha ingresada no es valida.");
+    }
+    data.projectedDate = projectedDate;
+  }
+
+  if (input.status !== undefined) {
+    if (input.status === "CANCELLED" || !movementStatuses.includes(input.status)) {
+      throw new Error("Para cancelar un movimiento usa la opcion 'Cancelar sin borrar' en su detalle.");
+    }
+    data.status = input.status;
+  }
+
+  if (input.amount !== undefined) {
+    const amount = new Prisma.Decimal(input.amount);
+    if (!amount.isFinite() || amount.lte(0)) {
+      throw new Error("El monto debe ser mayor a 0.");
+    }
+    data.amount = amount;
+    data.projectedAmountClp = current.currency === "CLP" ? amount : amount.mul(current.projectedRate);
+  }
+
+  const updated = await prisma.movement.update({ where: { id: input.id }, data });
+
+  await audit({ companyId: user.companyId, userId: user.id, entityId: input.id, action: "UPDATE", before: current, after: updated });
   revalidatePath("/app/movimientos");
 }
 
