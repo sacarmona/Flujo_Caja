@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import type { Currency, MovementStatus, MovementType, Role } from "@prisma/client";
+import type { AccountingAccountType, Currency, MovementStatus, MovementType, Role } from "@prisma/client";
 
 export const movementTypes = ["INCOME", "EXPENSE"] as const satisfies MovementType[];
 export const movementStatuses = [
@@ -11,6 +11,15 @@ export const movementStatuses = [
   "CANCELLED"
 ] as const satisfies MovementStatus[];
 export const movementCurrencies = ["CLP", "UF", "EUR", "USD"] as const satisfies Currency[];
+
+/**
+ * Cuentas con type "INCOME" solo aplican a movimientos/recurrencias tipo
+ * INCOME; cualquier otro AccountingAccountType (DIRECT_COST, ADMIN_EXPENSE,
+ * TAX, FINANCING, INVESTMENT, NON_OPERATIONAL) aplica a EXPENSE.
+ */
+export function accountMatchesMovementType(accountType: AccountingAccountType, movementType: MovementType): boolean {
+  return movementType === "INCOME" ? accountType === "INCOME" : accountType !== "INCOME";
+}
 
 export type MovementFormInput = {
   type: MovementType;

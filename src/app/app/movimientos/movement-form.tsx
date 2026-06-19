@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { AccountingAccountType, MovementType } from "@prisma/client";
-import { movementCurrencies, movementStatuses, movementTypes } from "@/lib/movements";
+import { accountMatchesMovementType, movementCurrencies, movementStatuses, movementTypes } from "@/lib/movements";
 import { dateInputValue, optionLabel, statusLabels, todayInputValue, typeLabels, type MovementWithRelations } from "@/app/app/movimientos/shared";
 
 type ReferenceLists = {
@@ -12,10 +12,6 @@ type ReferenceLists = {
   costCenters: { id: string; code: string | null; name: string }[];
   projects: { id: string; name: string }[];
 };
-
-function accountMatchesMovementType(accountType: AccountingAccountType, movementType: MovementType) {
-  return movementType === "INCOME" ? accountType === "INCOME" : accountType !== "INCOME";
-}
 
 export function SelectOptions<T extends string>({ values, labels }: { values: readonly T[]; labels: Record<T, string> }) {
   return values.map((value) => (
