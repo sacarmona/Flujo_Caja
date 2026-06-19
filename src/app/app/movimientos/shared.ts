@@ -50,33 +50,38 @@ export function formatAmount(amount: { toString(): string } | number, currency: 
   return currency === "CLP" ? formatCurrency(Number(amount)) : `${amount.toString()} ${currency}`;
 }
 
-function weekStartKey(date: Date): string {
-  const day = date.getDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate() + diffToMonday);
-  const year = monday.getFullYear();
-  const month = String(monday.getMonth() + 1).padStart(2, "0");
-  const dayOfMonth = String(monday.getDate()).padStart(2, "0");
-  return `${year}-${month}-${dayOfMonth}`;
+/**
+ * Numero de semana del año en bloques fijos de 7 dias desde el 1 de enero
+ * (Semana 1 = 01-01 al 07-01, Semana 2 = 08-01 al 14-01, ...), no semanas
+ * ISO alineadas a lunes. Se usa UTC solo para la aritmetica de dias (evita
+ * desfases por horario de verano), tomando los componentes de fecha local.
+ */
+function weekOfYear(date: Date): { year: number; week: number } {
+  const year = date.getFullYear();
+  const utcDate = Date.UTC(year, date.getMonth(), date.getDate());
+  const utcStart = Date.UTC(year, 0, 1);
+  const dayOfYear = Math.round((utcDate - utcStart) / 86400000) + 1;
+  return { year, week: Math.min(Math.ceil(dayOfYear / 7), 52) };
 }
 
 /**
- * Agrupa una lista ya ordenada por fecha en bloques de semana consecutivos,
- * etiquentandolos secuencialmente ("Semana 1", "Semana 2", ...) en el orden
- * en que aparecen, no por numero de semana calendario absoluto.
+ * Agrupa una lista ya ordenada por fecha en bloques de semana del año
+ * calendario (Semana 1 a Semana 52), etiquetando cada bloque con su numero
+ * real de semana en vez de un contador secuencial de apariciones.
  */
 export function groupByWeek<T>(items: T[], dateOf: (item: T) => Date): { label: string; items: T[] }[] {
-  const groups: { key: string; items: T[] }[] = [];
+  const groups: { key: string; label: string; items: T[] }[] = [];
 
   for (const item of items) {
-    const key = weekStartKey(dateOf(item));
+    const { year, week } = weekOfYear(dateOf(item));
+    const key = `${year}-${week}`;
     const last = groups.at(-1);
     if (last && last.key === key) {
       last.items.push(item);
     } else {
-      groups.push({ key, items: [item] });
+      groups.push({ key, label: `Semana ${week}`, items: [item] });
     }
   }
 
-  return groups.map((group, index) => ({ label: `Semana ${index + 1}`, items: group.items }));
+  return groups;
 }
