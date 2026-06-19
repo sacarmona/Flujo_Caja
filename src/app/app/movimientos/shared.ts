@@ -52,23 +52,24 @@ export function formatAmount(amount: { toString(): string } | number, currency: 
 }
 
 /**
- * Numero de semana del año en bloques fijos de 7 dias desde el 1 de enero
- * (Semana 1 = 01-01 al 07-01, Semana 2 = 08-01 al 14-01, ...), no semanas
- * ISO alineadas a lunes. Se usa UTC solo para la aritmetica de dias (evita
- * desfases por horario de verano), tomando los componentes de fecha local.
+ * Numero de semana ISO 8601: semanas de lunes a domingo, y la Semana 1 de
+ * cada año es la que contiene el primer jueves de ese año. Se usa UTC solo
+ * para la aritmetica de dias (evita desfases por horario de verano), tomando
+ * los componentes de fecha local (no es una conversion real de zona horaria).
  */
 function weekOfYear(date: Date): { year: number; week: number } {
-  const year = date.getFullYear();
-  const utcDate = Date.UTC(year, date.getMonth(), date.getDate());
-  const utcStart = Date.UTC(year, 0, 1);
-  const dayOfYear = Math.round((utcDate - utcStart) / 86400000) + 1;
-  return { year, week: Math.min(Math.ceil(dayOfYear / 7), 52) };
+  const isoWeekday = ((date.getDay() + 6) % 7) + 1; // lunes=1 ... domingo=7
+  const thursdayUtc = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate() + (4 - isoWeekday));
+  const isoYear = new Date(thursdayUtc).getUTCFullYear();
+  const yearStartUtc = Date.UTC(isoYear, 0, 1);
+  const week = Math.ceil((Math.round((thursdayUtc - yearStartUtc) / 86400000) + 1) / 7);
+  return { year: isoYear, week };
 }
 
 /**
- * Agrupa una lista ya ordenada por fecha en bloques de semana del año
- * calendario (Semana 1 a Semana 52), etiquetando cada bloque con su numero
- * real de semana en vez de un contador secuencial de apariciones.
+ * Agrupa una lista ya ordenada por fecha en bloques de semana ISO 8601
+ * (lunes a domingo), etiquetando cada bloque con su numero real de semana
+ * en vez de un contador secuencial de apariciones.
  */
 export function groupByWeek<T>(items: T[], dateOf: (item: T) => Date): { label: string; items: T[] }[] {
   const groups: { key: string; label: string; items: T[] }[] = [];
