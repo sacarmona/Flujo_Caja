@@ -96,4 +96,16 @@ describe("calendar view helpers", () => {
     expect(weeks).toHaveLength(2);
     expect(weeks[0].days).toHaveLength(2);
   });
+
+  it("inicia una semana nueva aunque el lunes sea feriado y no aparezca en los dias habiles", () => {
+    const weeks = groupDaysByWeek([
+      day({ date: new Date(2026, 5, 26) }), // viernes, semana del 22-06
+      day({ date: new Date(2026, 5, 30) }), // martes, semana del 29-06 (lunes 29 es feriado)
+      day({ date: new Date(2026, 6, 1) })
+    ]);
+
+    expect(weeks).toHaveLength(2);
+    expect(weeks[0].days).toHaveLength(1);
+    expect(weeks[1].days).toHaveLength(2);
+  });
 });

@@ -33,15 +33,29 @@ export function calendarMode(value?: string): CalendarMode {
   return value === "real" || value === "comparison" ? value : "projected";
 }
 
+/**
+ * Clave del lunes de la semana de una fecha. No se puede agrupar buscando
+ * directamente un dia con getDay() === 1 porque `days` solo contiene dias
+ * habiles: si el lunes de una semana es feriado (ej. 29-06-2026, San Pedro y
+ * San Pablo) no aparece en la lista y la semana siguiente quedaria mezclada
+ * con la anterior.
+ */
+function mondayKey(date: Date): string {
+  const day = date.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  return dateKey(new Date(date.getFullYear(), date.getMonth(), date.getDate() + diffToMonday));
+}
+
 export function groupDaysByWeek(days: CashFlowDay[]) {
   const weeks: { key: string; days: CashFlowDay[] }[] = [];
 
   for (const day of days) {
+    const key = mondayKey(day.date);
     const last = weeks.at(-1);
-    if (!last || day.date.getDay() === 1) {
-      weeks.push({ key: dateKey(day.date), days: [day] });
-    } else {
+    if (last && last.key === key) {
       last.days.push(day);
+    } else {
+      weeks.push({ key, days: [day] });
     }
   }
 
