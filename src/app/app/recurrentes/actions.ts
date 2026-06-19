@@ -11,6 +11,7 @@ import {
 } from "@/lib/recurrence-rules";
 import { generateMovementsForRecurrence } from "@/lib/recurrence-service";
 import { getCurrentUser } from "@/lib/auth";
+import { getHolidayKeys } from "@/lib/holidays-cl";
 import { prisma } from "@/lib/prisma";
 
 function stringValue(formData: FormData, key: string): string {
@@ -194,9 +195,11 @@ export async function setRecurrenceActiveAction(formData: FormData) {
 export async function generateRecurringMovementsAction(formData: FormData) {
   const user = await requireRecurrenceManager();
   const id = stringValue(formData, "id");
+  const holidays = await getHolidayKeys(prisma);
   const result = await generateMovementsForRecurrence(id, {
     prisma,
     exchangeRateProvider: new DatabaseExchangeRateProvider(user.companyId),
+    holidays,
     months: 12
   });
 

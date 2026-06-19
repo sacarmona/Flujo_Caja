@@ -2,6 +2,42 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { accountingPlan } from "./accounting-plan.mjs";
 
+// Copia local de feriados chilenos 2025-2026 (debe coincidir con
+// src/lib/holidays-cl.ts). Los feriados moviles (Viernes/Sabado Santo) se
+// cargan explicitamente por ano en vez de calcularse.
+const chileHolidays = [
+  { date: "2025-01-01", name: "Ano Nuevo" },
+  { date: "2025-04-18", name: "Viernes Santo" },
+  { date: "2025-04-19", name: "Sabado Santo" },
+  { date: "2025-05-01", name: "Dia del Trabajo" },
+  { date: "2025-05-21", name: "Dia de las Glorias Navales" },
+  { date: "2025-06-29", name: "San Pedro y San Pablo" },
+  { date: "2025-07-16", name: "Dia de la Virgen del Carmen" },
+  { date: "2025-08-15", name: "Asuncion de la Virgen" },
+  { date: "2025-09-18", name: "Fiestas Patrias" },
+  { date: "2025-09-19", name: "Glorias del Ejercito" },
+  { date: "2025-10-12", name: "Encuentro de Dos Mundos" },
+  { date: "2025-10-31", name: "Dia de las Iglesias Evangelicas" },
+  { date: "2025-11-01", name: "Dia de Todos los Santos" },
+  { date: "2025-12-08", name: "Inmaculada Concepcion" },
+  { date: "2025-12-25", name: "Navidad" },
+  { date: "2026-01-01", name: "Ano Nuevo" },
+  { date: "2026-04-03", name: "Viernes Santo" },
+  { date: "2026-04-04", name: "Sabado Santo" },
+  { date: "2026-05-01", name: "Dia del Trabajo" },
+  { date: "2026-05-21", name: "Dia de las Glorias Navales" },
+  { date: "2026-06-29", name: "San Pedro y San Pablo" },
+  { date: "2026-07-16", name: "Dia de la Virgen del Carmen" },
+  { date: "2026-08-15", name: "Asuncion de la Virgen" },
+  { date: "2026-09-18", name: "Fiestas Patrias" },
+  { date: "2026-09-19", name: "Glorias del Ejercito" },
+  { date: "2026-10-12", name: "Encuentro de Dos Mundos" },
+  { date: "2026-10-31", name: "Dia de las Iglesias Evangelicas" },
+  { date: "2026-11-01", name: "Dia de Todos los Santos" },
+  { date: "2026-12-08", name: "Inmaculada Concepcion" },
+  { date: "2026-12-25", name: "Navidad" }
+];
+
 const prisma = new PrismaClient();
 
 const companyName = "ADENTU Ingenier\u00eda SpA";
@@ -13,6 +49,16 @@ const demoUsers = [
   { email: "admin@adentu.cl", name: "Usuario Demo Admin", role: "ADMIN" },
   { email: "finanzas@adentu.cl", name: "Usuario Demo Finanzas", role: "FINANCE" }
 ];
+
+// Construye una fecha local (no UTC) a partir de "YYYY-MM-DD", consistente
+// con dateOnly/dateKey de src/lib/recurrences.ts, que usan los metodos
+// locales de Date (getFullYear/getMonth/getDate). Usar `new Date(iso)`
+// directamente parsea como UTC y desfasa el dia al leer con metodos locales
+// en zonas horarias negativas como America/Santiago.
+function localDateFromISO(iso) {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
 
 async function upsertAccountingAccount(companyId, account, parent = null, level = 1) {
   const saved = await prisma.accountingAccount.upsert({
@@ -107,6 +153,15 @@ async function main() {
 
   for (const account of accountingPlan) {
     await upsertAccountingAccount(company.id, account);
+  }
+
+  for (const holiday of chileHolidays) {
+    const date = localDateFromISO(holiday.date);
+    await prisma.holiday.upsert({
+      where: { date },
+      update: { name: holiday.name },
+      create: { date, name: holiday.name, isManual: false }
+    });
   }
 
   if (openingBalance) {

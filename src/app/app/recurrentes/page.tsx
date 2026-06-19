@@ -18,6 +18,7 @@ import {
   recurrenceFrequencies
 } from "@/lib/recurrence-rules";
 import { dateKey } from "@/lib/recurrences";
+import { getHolidayKeys } from "@/lib/holidays-cl";
 import { prisma } from "@/lib/prisma";
 
 const pageSize = 10;
@@ -283,10 +284,11 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
     return null;
   }
 
-  const [referenceData, defaults, result] = await Promise.all([
+  const [referenceData, defaults, result, holidays] = await Promise.all([
     getReferenceData(user.companyId),
     getRecurrenceDefaults(user.companyId),
-    getRecurrences(user.companyId, filters)
+    getRecurrences(user.companyId, filters),
+    getHolidayKeys(prisma)
   ]);
   const canManage = canManageRecurrences(user.role);
 
@@ -362,7 +364,7 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
         </div>
 
         {result.items.map((recurrence) => {
-          const preview = previewRecurrence(recurrence);
+          const preview = previewRecurrence(recurrence, holidays);
           return (
             <article className="rounded-lg border border-slate-200 bg-white p-4" key={recurrence.id}>
               <div className="flex flex-wrap items-start justify-between gap-3">

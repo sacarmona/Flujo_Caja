@@ -15,6 +15,7 @@ import {
 import { dateKey } from "@/lib/recurrences";
 import { formatCurrency } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
+import { getHolidayKeys } from "@/lib/holidays-cl";
 import { movementCurrencies, movementStatuses, movementTypes } from "@/lib/movements";
 import { prisma } from "@/lib/prisma";
 
@@ -114,22 +115,21 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
   const mode = calendarMode(filters.mode);
   const startDate = new Date();
   const collapsed = new Set((filters.collapsed ?? "").split("|").filter(Boolean));
-  const [referenceData, result] = await Promise.all([
-    getReferenceData(user.companyId),
-    calculateSantanderCashFlow({
-      prisma,
-      companyId: user.companyId,
-      startDate,
-      months,
-      filters: {
-        businessUnitId: filters.businessUnitId,
-        accountingAccountId: filters.accountingAccountId,
-        status: filters.status,
-        type: filters.type,
-        currency: filters.currency
-      }
-    })
-  ]);
+  const [referenceData, holidays] = await Promise.all([getReferenceData(user.companyId), getHolidayKeys(prisma)]);
+  const result = await calculateSantanderCashFlow({
+    prisma,
+    companyId: user.companyId,
+    startDate,
+    months,
+    holidays,
+    filters: {
+      businessUnitId: filters.businessUnitId,
+      accountingAccountId: filters.accountingAccountId,
+      status: filters.status,
+      type: filters.type,
+      currency: filters.currency
+    }
+  });
   const accounts = referenceData.accounts.map((account) => ({
     id: account.id,
     code: account.code,

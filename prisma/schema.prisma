@@ -79,6 +79,7 @@ model Company {
   accountingAccounts AccountingAccount[]
   auditLogs          AuditLog[]
   bankAccounts       BankAccount[]
+  bankImportBatches  BankImportBatch[]
   businessUnits      BusinessUnit[]
   costCenters        CostCenter[]
   exchangeRates      ExchangeRate[]
@@ -99,9 +100,12 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  company   Company    @relation(fields: [companyId], references: [id])
-  auditLogs AuditLog[]
-  sessions  Session[]
+  company                  Company           @relation(fields: [companyId], references: [id])
+  auditLogs                AuditLog[]
+  sessions                 Session[]
+  uploadedAttachments      Attachment[]
+  importBatches            BankImportBatch[]
+  confirmedReconciliations Reconciliation[]
 }
 
 model Session {
@@ -210,11 +214,13 @@ model BankAccount {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  company         Company          @relation(fields: [companyId], references: [id])
-  movements       Movement[]
-  openingBalances OpeningBalance[]
-  payments        Payment[]
-  recurrenceRules RecurrenceRule[]
+  company           Company           @relation(fields: [companyId], references: [id])
+  movements         Movement[]
+  openingBalances   OpeningBalance[]
+  payments          Payment[]
+  recurrenceRules   RecurrenceRule[]
+  bankImportBatches BankImportBatch[]
+  bankMovements     BankMovement[]
 
   @@unique([companyId, name])
   @@index([companyId])
@@ -277,6 +283,8 @@ model Movement {
   payments          Payment[]
   project           Project?          @relation(fields: [projectId], references: [id])
   recurrenceRule    RecurrenceRule?   @relation(fields: [recurrenceRuleId], references: [id])
+  attachments       Attachment[]
+  reconciliations   Reconciliation[]
 
   @@unique([recurrenceRuleId, recurrenceOccurrenceDate])
   @@index([accountingAccountId])
@@ -344,8 +352,10 @@ model Payment {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id])
-  movement    Movement    @relation(fields: [movementId], references: [id])
+  bankAccount    BankAccount     @relation(fields: [bankAccountId], references: [id])
+  movement       Movement        @relation(fields: [movementId], references: [id])
+  attachments    Attachment[]
+  reconciliation Reconciliation?
 
   @@index([bankAccountId])
   @@index([movementId])
@@ -386,4 +396,131 @@ model AuditLog {
 
   @@index([companyId, entity, entityId])
   @@index([userId])
+}
+
+/// Dias no laborables (feriados oficiales chilenos cargados por seed mas
+/// dias especiales agregados manualmente por ADMIN). Se mantiene una copia
+/// local en base de datos en vez de consultar una fuente externa en cada
+/// calculo, para que los calculos historicos no cambien inesperadamente.
+model Holiday {
+  id        String   @id @default(cuid())
+  date      DateTime @unique
+  name      String
+  isManual  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([date])
+}
+
+model Attachment {
+  id           String    @id @default(cuid())
+  movementId   String?
+  paymentId    String?
+  originalName String
+  storageKey   String
+  mimeType     String
+  sizeBytes    Int
+  uploadedById String
+  uploadedAt   DateTime  @default(now())
+  deletedAt    DateTime?
+
+  movement   Movement? @relation(fields: [movementId], references: [id])
+  payment    Payment?  @relation(fields: [paymentId], references: [id])
+  uploadedBy User      @relation(fields: [uploadedById], references: [id])
+
+  @@index([movementId])
+  @@index([paymentId])
+}
+
+enum ImportBatchStatus {
+  UPLOADED
+  MAPPED
+  PROCESSED
+  FAILED
+}
+
+model BankImportBatch {
+  id            String            @id @default(cuid())
+  companyId     String
+  bankAccountId String
+  fileName      String
+  status        ImportBatchStatus @default(UPLOADED)
+  uploadedById  String
+  uploadedAt    DateTime          @default(now())
+
+  company       Company         @relation(fields: [companyId], references: [id])
+  bankAccount   BankAccount     @relation(fields: [bankAccountId], references: [id])
+  uploadedBy    User            @relation(fields: [uploadedById], references: [id])
+  rows          BankImportRow[]
+  bankMovements BankMovement[]
+
+  @@index([companyId])
+  @@index([bankAccountId])
+}
+
+model BankImportRow {
+  id             String   @id @default(cuid())
+  batchId        String
+  rowNumber      Int
+  rawData        Json
+  normalizedData Json?
+  error          String?
+  createdAt      DateTime @default(now())
+
+  batch BankImportBatch @relation(fields: [batchId], references: [id])
+
+  @@index([batchId])
+}
+
+enum BankMovementType {
+  CARGO
+  ABONO
+}
+
+model BankMovement {
+  id                    String           @id @default(cuid())
+  batchId               String
+  bankAccountId         String
+  date                  DateTime
+  amount                Decimal          @db.Decimal(14, 2)
+  type                  BankMovementType
+  description           String
+  normalizedDescription String?
+  reference             String?
+  createdAt             DateTime         @default(now())
+
+  batch          BankImportBatch @relation(fields: [batchId], references: [id])
+  bankAccount    BankAccount     @relation(fields: [bankAccountId], references: [id])
+  reconciliation Reconciliation?
+
+  @@index([batchId])
+  @@index([bankAccountId])
+}
+
+enum ReconciliationMatchLevel {
+  HIGH
+  POSSIBLE
+  NONE
+}
+
+model Reconciliation {
+  id             String                   @id @default(cuid())
+  bankMovementId String                   @unique
+  movementId     String?
+  paymentId      String?                  @unique
+  matchLevel     ReconciliationMatchLevel
+  confirmed      Boolean                  @default(false)
+  confirmedById  String?
+  confirmedAt    DateTime?
+  reversed       Boolean                  @default(false)
+  reversedAt     DateTime?
+  reversalReason String?
+  createdAt      DateTime                 @default(now())
+
+  bankMovement BankMovement @relation(fields: [bankMovementId], references: [id])
+  movement     Movement?    @relation(fields: [movementId], references: [id])
+  payment      Payment?     @relation(fields: [paymentId], references: [id])
+  confirmedBy  User?        @relation(fields: [confirmedById], references: [id])
+
+  @@index([movementId])
 }
