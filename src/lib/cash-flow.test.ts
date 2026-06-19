@@ -53,8 +53,8 @@ describe("cash flow business-day service", () => {
     );
 
     expect(result.openingBalance.toString()).toBe("1000000");
-    expect(result.days[0].projectedIncome.toString()).toBe("200000");
-    expect(result.days[0].projectedExpense.toString()).toBe("50000");
+    expect(result.days[0].realIncome.toString()).toBe("200000");
+    expect(result.days[0].realExpense.toString()).toBe("50000");
     expect(result.days[0].netFlow.toString()).toBe("150000");
     expect(result.days[0].accumulatedBalance.toString()).toBe("1150000");
   });
@@ -84,13 +84,38 @@ describe("cash flow business-day service", () => {
     expect(result.days.find((day) => day.date.getDate() === 16)?.realIncome.toString()).toBe("80000");
   });
 
-  it("separates projected pending movements from paid real movements", () => {
+  it("keeps movements still Proyectado out of the real total", () => {
+    const result = calculateCashFlowByBusinessDay(
+      [
+        {
+          ...baseMovement,
+          id: "projected",
+          type: "EXPENSE" as const,
+          status: "PROJECTED" as const,
+          projectedDate: date("2026-06-17"),
+          projectedAmountClp: "30000",
+          accountingAccountId: expenseAccount.id,
+          businessUnitId: unitAdmin.id,
+          accountingAccount: expenseAccount,
+          businessUnit: unitAdmin
+        }
+      ],
+      openingBalances,
+      { startDate: date("2026-06-17"), endDate: date("2026-06-17") }
+    );
+
+    expect(result.days[0].projectedExpense.toString()).toBe("30000");
+    expect(result.days[0].realExpense.toString()).toBe("0");
+  });
+
+  it("counts Pendiente movements without payment as real, using el monto y fecha proyectados", () => {
     const result = calculateCashFlowByBusinessDay(
       [
         {
           ...baseMovement,
           id: "pending",
           type: "EXPENSE" as const,
+          status: "PENDING" as const,
           projectedDate: date("2026-06-17"),
           projectedAmountClp: "30000",
           accountingAccountId: expenseAccount.id,
@@ -116,9 +141,33 @@ describe("cash flow business-day service", () => {
       { startDate: date("2026-06-17"), endDate: date("2026-06-18") }
     );
 
-    expect(result.days[0].projectedExpense.toString()).toBe("30000");
-    expect(result.days[0].realExpense.toString()).toBe("0");
+    expect(result.days[0].projectedExpense.toString()).toBe("0");
+    expect(result.days[0].realExpense.toString()).toBe("30000");
     expect(result.days[1].realExpense.toString()).toBe("50000");
+  });
+
+  it("excluye Vencido del total real", () => {
+    const result = calculateCashFlowByBusinessDay(
+      [
+        {
+          ...baseMovement,
+          id: "overdue",
+          type: "EXPENSE" as const,
+          status: "OVERDUE" as const,
+          projectedDate: date("2026-06-17"),
+          projectedAmountClp: "15000",
+          accountingAccountId: expenseAccount.id,
+          businessUnitId: unitAdmin.id,
+          accountingAccount: expenseAccount,
+          businessUnit: unitAdmin
+        }
+      ],
+      openingBalances,
+      { startDate: date("2026-06-17"), endDate: date("2026-06-17") }
+    );
+
+    expect(result.days[0].projectedExpense.toString()).toBe("15000");
+    expect(result.days[0].realExpense.toString()).toBe("0");
   });
 
   it("groups by category, account and business unit", () => {
@@ -128,6 +177,7 @@ describe("cash flow business-day service", () => {
           ...baseMovement,
           id: "grouped",
           type: "INCOME" as const,
+          status: "PROJECTED" as const,
           projectedDate: date("2026-06-15"),
           projectedAmountClp: "123000",
           accountingAccountId: incomeAccount.id,
@@ -186,8 +236,8 @@ describe("cash flow business-day service", () => {
       }
     });
 
-    expect(result.days[0].projectedIncome.toString()).toBe("90000");
-    expect(result.days[0].projectedExpense.toString()).toBe("0");
+    expect(result.days[0].realIncome.toString()).toBe("90000");
+    expect(result.days[0].realExpense.toString()).toBe("0");
   });
 
   it("calculates weekly totals with Monday week start", () => {

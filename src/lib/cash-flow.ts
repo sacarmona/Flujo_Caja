@@ -160,6 +160,13 @@ function movementCategory(movement: CashFlowMovement) {
   return movement.accountingAccount.parent?.name ?? movement.accountingAccount.name;
 }
 
+/**
+ * Estados que cuentan como "Real" en el calendario: dinero ya cobrado/pagado
+ * (parcial o total) o movimientos vencidos para pago/cobro (Pendiente).
+ * Proyectado y Vencido no entran al Real; Cancelado ya se excluye antes.
+ */
+const realEligibleStatuses: MovementStatus[] = ["PENDING", "PARTIALLY_PAID", "PAID_OR_COLLECTED"];
+
 function bucketFor(type: MovementType, isReal: boolean): keyof CashFlowGroupTotals {
   if (type === "INCOME") {
     return isReal ? "realIncome" : "projectedIncome";
@@ -208,6 +215,7 @@ export function calculateCashFlowByBusinessDay(
     }
 
     const active = movement.payments.filter((payment) => !payment.deletedAt && !payment.cancelledAt);
+    const isReal = realEligibleStatuses.includes(movement.status);
 
     if (active.length > 0) {
       for (const payment of active) {
@@ -221,7 +229,7 @@ export function calculateCashFlowByBusinessDay(
       const projectedDate = moveToNextBusinessDay(movement.projectedDate, holidaySet);
       const day = dayByKey.get(dateKey(projectedDate));
       if (day) {
-        addEntry(day, movement, decimal(movement.projectedAmountClp), false);
+        addEntry(day, movement, decimal(movement.projectedAmountClp), isReal);
       }
     }
   }
