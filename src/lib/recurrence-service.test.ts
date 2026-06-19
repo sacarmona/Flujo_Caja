@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldPreserveRecurrenceMovement, shouldRewriteRecurrenceMovement } from "./recurrence-service";
+import { filterNewRecurrenceOccurrences, shouldPreserveRecurrenceMovement, shouldRewriteRecurrenceMovement } from "./recurrence-service";
 
 describe("recurrence service status rules", () => {
   it("preserves paid and partially paid generated movements", () => {
@@ -14,5 +14,14 @@ describe("recurrence service status rules", () => {
     expect(shouldRewriteRecurrenceMovement("PENDING")).toBe(true);
     expect(shouldRewriteRecurrenceMovement("OVERDUE")).toBe(true);
     expect(shouldRewriteRecurrenceMovement("CANCELLED")).toBe(true);
+  });
+
+  it("skips new recurrence occurrences when the projected date already exists", () => {
+    const occurrences = [
+      { occurrenceDate: new Date(2026, 5, 29), projectedDate: new Date(2026, 5, 29) },
+      { occurrenceDate: new Date(2026, 6, 29), projectedDate: new Date(2026, 6, 29) }
+    ];
+
+    expect(filterNewRecurrenceOccurrences(occurrences, ["2026-06-29"])).toEqual([occurrences[1]]);
   });
 });

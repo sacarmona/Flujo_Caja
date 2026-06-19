@@ -20,6 +20,12 @@ export function shouldRewriteRecurrenceMovement(status: MovementStatus): boolean
   return !shouldPreserveRecurrenceMovement(status);
 }
 
+export function filterNewRecurrenceOccurrences<T extends { projectedDate: Date }>(occurrences: T[], existingProjectedDateKeys: string[]): T[] {
+  const existing = new Set(existingProjectedDateKeys);
+
+  return occurrences.filter((occurrence) => !existing.has(dateKey(occurrence.projectedDate)));
+}
+
 export async function generateMovementsForRecurrence(ruleId: string, options: RecurrenceServiceOptions) {
   return options.prisma.$transaction(async (tx) => {
     const rule = await tx.recurrenceRule.findUnique({
@@ -27,7 +33,7 @@ export async function generateMovementsForRecurrence(ruleId: string, options: Re
       include: {
         movements: {
           where: { recurrenceOccurrenceDate: { not: null } },
-          select: { recurrenceOccurrenceDate: true }
+          select: { recurrenceOccurrenceDate: true, projectedDate: true, deletedAt: true }
         }
       }
     });
@@ -40,7 +46,10 @@ export async function generateMovementsForRecurrence(ruleId: string, options: Re
       .map((movement) => movement.recurrenceOccurrenceDate)
       .filter((date): date is Date => Boolean(date))
       .map(dateKey);
-    const occurrences = generateRecurrenceOccurrences(
+    const existingProjectedDateKeys = rule.movements
+      .filter((movement) => !movement.deletedAt)
+      .map((movement) => dateKey(movement.projectedDate));
+    const generatedOccurrences = generateRecurrenceOccurrences(
       {
         frequency: rule.frequency,
         intervalDays: rule.intervalDays,
@@ -53,6 +62,7 @@ export async function generateMovementsForRecurrence(ruleId: string, options: Re
         existingOccurrenceKeys: existingKeys
       }
     );
+    const occurrences = filterNewRecurrenceOccurrences(generatedOccurrences, existingProjectedDateKeys);
 
     let created = 0;
 
@@ -89,7 +99,7 @@ export async function generateMovementsForRecurrence(ruleId: string, options: Re
       created += 1;
     }
 
-    return { created, skipped: existingKeys.length };
+    return { created, skipped: existingKeys.length + (generatedOccurrences.length - occurrences.length) };
   });
 }
 

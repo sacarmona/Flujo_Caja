@@ -87,7 +87,7 @@ async function getRecurrences(companyId: string, filters: SearchParams) {
         businessUnit: true,
         costCenter: true,
         project: true,
-        _count: { select: { movements: true } }
+        _count: { select: { movements: { where: { deletedAt: null } } } }
       },
       orderBy: [{ isActive: "desc" }, { startDate: "desc" }],
       skip: (page - 1) * pageSize,
