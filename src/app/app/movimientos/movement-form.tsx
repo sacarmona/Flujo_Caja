@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { AccountingAccountType, MovementType } from "@prisma/client";
 import { movementCurrencies, movementStatuses, movementTypes } from "@/lib/movements";
-import { dateInputValue, optionLabel, statusLabels, typeLabels, type MovementWithRelations } from "@/app/app/movimientos/shared";
+import { dateInputValue, optionLabel, statusLabels, todayInputValue, typeLabels, type MovementWithRelations } from "@/app/app/movimientos/shared";
 
 type ReferenceLists = {
   accounts: { id: string; code: string | null; name: string; type: AccountingAccountType }[];
@@ -187,7 +187,7 @@ export function MovementForm({
           name="projectedDate"
           required
           type="date"
-          defaultValue={dateInputValue(movement?.projectedDate ?? null)}
+          defaultValue={movement ? dateInputValue(movement.projectedDate) : todayInputValue()}
         />
       </label>
       <label className="text-sm">
@@ -196,7 +196,7 @@ export function MovementForm({
           className="w-full rounded-md border border-slate-300 px-2 py-2"
           name="realDate"
           type="date"
-          defaultValue={dateInputValue(movement?.realDate ?? null)}
+          defaultValue={movement ? dateInputValue(movement.realDate) : todayInputValue()}
         />
       </label>
       <label className="text-sm md:col-span-2">

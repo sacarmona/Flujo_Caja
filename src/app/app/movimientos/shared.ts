@@ -38,6 +38,14 @@ export function dateInputValue(date: Date | null) {
   return date ? date.toISOString().slice(0, 10) : "";
 }
 
+export function todayInputValue(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function formatAmount(amount: { toString(): string } | number, currency: string) {
   return currency === "CLP" ? formatCurrency(Number(amount)) : `${amount.toString()} ${currency}`;
 }
