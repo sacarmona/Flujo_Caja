@@ -318,6 +318,7 @@ export async function setRecurrenceActiveAction(formData: FormData) {
     });
 
     let softDeletedMovements = 0;
+    let softDeletedMovementIds: string[] = [];
     if (!active) {
       const removableMovements = await tx.movement.findMany({
         where: {
@@ -327,31 +328,19 @@ export async function setRecurrenceActiveAction(formData: FormData) {
           status: { notIn: ["PAID_OR_COLLECTED", "PARTIALLY_PAID"] }
         }
       });
-      const deletedAt = new Date();
+      softDeletedMovementIds = removableMovements.map((movement) => movement.id);
 
-      for (const movement of removableMovements) {
-        const updatedMovement = await tx.movement.update({
-          where: { id: movement.id },
-          data: { deletedAt }
-        });
-        await tx.auditLog.create({
+      if (softDeletedMovementIds.length > 0) {
+        const result = await tx.movement.updateMany({
+          where: {
+            id: { in: softDeletedMovementIds }
+          },
           data: {
-            companyId: user.companyId,
-            userId: user.id,
-            entity: "Movement",
-            entityId: movement.id,
-            action: "SOFT_DELETE",
-            before: JSON.parse(JSON.stringify(movement)),
-            after: JSON.parse(JSON.stringify(updatedMovement)),
-            metadata: {
-              source: "recurrence-deactivate",
-              recurrenceRuleId: id
-            }
+            deletedAt: new Date()
           }
         });
+        softDeletedMovements = result.count;
       }
-
-      softDeletedMovements = removableMovements.length;
     }
 
     await tx.auditLog.create({
@@ -365,7 +354,8 @@ export async function setRecurrenceActiveAction(formData: FormData) {
         after: JSON.parse(JSON.stringify(saved)),
         metadata: {
           source: active ? "recurrence-reactivate" : "recurrence-deactivate",
-          softDeletedMovements
+          softDeletedMovements,
+          softDeletedMovementIds
         }
       }
     });
