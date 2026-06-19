@@ -5,7 +5,7 @@ import { Prisma } from "@prisma/client";
 import type { Currency, MovementStatus, MovementType } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 import { resolveConversionAllowManualFallback, type ExchangeRateProvider } from "@/lib/exchange-rates";
-import { assertCanModifyMovements, movementStatuses, validateMovementInput, type MovementFormInput } from "@/lib/movements";
+import { assertCanModifyMovements, canCancelAndDeleteMovement, movementStatuses, validateMovementInput, type MovementFormInput } from "@/lib/movements";
 import { getCurrentUser } from "@/lib/auth";
 import {
   nextRealDateAfterPayment,
@@ -109,9 +109,10 @@ async function audit(params: {
   userId: string;
   entityId: string;
   entity?: string;
-  action: "CREATE" | "UPDATE" | "CANCEL";
+  action: "CREATE" | "UPDATE" | "CANCEL" | "SOFT_DELETE";
   before?: unknown;
   after?: unknown;
+  metadata?: unknown;
 }) {
   await prisma.auditLog.create({
     data: {
@@ -121,7 +122,8 @@ async function audit(params: {
       entityId: params.entityId,
       action: params.action,
       before: params.before === undefined ? undefined : JSON.parse(JSON.stringify(params.before)),
-      after: params.after === undefined ? undefined : JSON.parse(JSON.stringify(params.after))
+      after: params.after === undefined ? undefined : JSON.parse(JSON.stringify(params.after)),
+      metadata: params.metadata === undefined ? undefined : JSON.parse(JSON.stringify(params.metadata))
     }
   });
 }
@@ -288,6 +290,51 @@ export async function cancelMovementAction(formData: FormData) {
     after: updated
   });
   revalidatePath("/app/movimientos");
+}
+
+export async function cancelAndDeleteMovementAction(input: { id: string; reason?: string }) {
+  const user = await requireMovementWriter();
+  const current = await prisma.movement.findFirst({
+    where: { id: input.id, companyId: user.companyId, deletedAt: null },
+    include: {
+      payments: true,
+      _count: { select: { reconciliations: true } }
+    }
+  });
+
+  if (!current) {
+    throw new Error("El movimiento no existe.");
+  }
+
+  if (!canCancelAndDeleteMovement(current)) {
+    throw new Error("Solo se pueden borrar del listado movimientos sin pagos, sin conciliaciones y no pagados.");
+  }
+
+  const updated = await prisma.movement.update({
+    where: { id: input.id },
+    data: {
+      status: "CANCELLED",
+      cancelledAt: new Date(),
+      deletedAt: new Date(),
+      notes: input.reason?.trim() || current.notes || "Cancelado y borrado del listado por ingreso erroneo."
+    }
+  });
+
+  await audit({
+    companyId: user.companyId,
+    userId: user.id,
+    entityId: input.id,
+    action: "SOFT_DELETE",
+    before: current,
+    after: updated,
+    metadata: {
+      source: "movement-list-cancel-and-delete",
+      reason: input.reason?.trim() || "Ingreso erroneo"
+    }
+  });
+  revalidatePath("/app/movimientos");
+  revalidatePath("/app/calendario");
+  revalidatePath("/app/recurrentes");
 }
 
 export async function registerPaymentAction(formData: FormData) {

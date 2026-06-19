@@ -63,6 +63,25 @@ export function assertCanModifyMovements(role: Role): void {
   }
 }
 
+export function canCancelAndDeleteMovement(movement: {
+  status: MovementStatus;
+  deletedAt?: Date | null;
+  cancelledAt?: Date | null;
+  payments?: Array<{ deletedAt?: Date | null; cancelledAt?: Date | null }>;
+  _count?: { reconciliations?: number };
+}): boolean {
+  const activePayments = movement.payments?.filter((payment) => !payment.deletedAt && !payment.cancelledAt).length ?? 0;
+  const reconciliations = movement._count?.reconciliations ?? 0;
+
+  return (
+    !movement.deletedAt &&
+    !movement.cancelledAt &&
+    !["PARTIALLY_PAID", "PAID_OR_COLLECTED"].includes(movement.status) &&
+    activePayments === 0 &&
+    reconciliations === 0
+  );
+}
+
 export function parsePositiveDecimal(value: string): Prisma.Decimal {
   const decimal = new Prisma.Decimal(value.replace(",", "."));
 

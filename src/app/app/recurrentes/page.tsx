@@ -264,7 +264,7 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
                         {recurrence.isActive ? (
                           <label className="flex items-center gap-2 text-sm text-slate-600">
                             <input name="confirmDeactivate" required type="checkbox" />
-                            Confirmo desactivar y conservar historial
+                            Confirmo desactivar y eliminar movimientos no pagados
                           </label>
                         ) : null}
                         <button className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-adentu-blue" type="submit">

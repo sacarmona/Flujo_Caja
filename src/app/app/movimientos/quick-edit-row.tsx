@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import type { MovementStatus } from "@prisma/client";
-import { quickUpdateMovementAction } from "@/app/app/movimientos/actions";
+import { cancelAndDeleteMovementAction, quickUpdateMovementAction } from "@/app/app/movimientos/actions";
 import { dateInputValue, optionLabel, statusLabels, typeLabels, type MovementWithRelations } from "@/app/app/movimientos/shared";
 import { AmountInput } from "@/components/amount-input";
 import { formatDate } from "@/lib/format";
+import { canCancelAndDeleteMovement } from "@/lib/movements";
 
 const quickEditableStatuses = Object.keys(statusLabels).filter((status) => status !== "CANCELLED") as MovementStatus[];
 
@@ -16,6 +17,7 @@ export function QuickEditRow({ canWrite, movement }: { canWrite: boolean; moveme
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const editable = canWrite && movement.status !== "CANCELLED";
+  const canCancelAndDelete = canWrite && canCancelAndDeleteMovement(movement);
 
   function run(input: { projectedDate?: string; status?: MovementStatus; amount?: string }) {
     setError(null);
@@ -24,6 +26,22 @@ export function QuickEditRow({ canWrite, movement }: { canWrite: boolean; moveme
         await quickUpdateMovementAction({ id: movement.id, ...input });
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : "No se pudo guardar el cambio.");
+      }
+    });
+  }
+
+  function cancelAndDelete() {
+    const confirmed = window.confirm(
+      "Este movimiento se cancelara y dejara de aparecer en el listado. Usa esta opcion solo si fue ingresado por error. ¿Continuar?"
+    );
+    if (!confirmed) return;
+
+    setError(null);
+    startTransition(async () => {
+      try {
+        await cancelAndDeleteMovementAction({ id: movement.id, reason: "Ingreso erroneo confirmado desde listado." });
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "No se pudo cancelar y borrar el movimiento.");
       }
     });
   }
@@ -84,9 +102,21 @@ export function QuickEditRow({ canWrite, movement }: { canWrite: boolean; moveme
         {error ? <p className="mt-1 max-w-[12rem] text-xs text-red-600">{error}</p> : null}
       </td>
       <td className="whitespace-nowrap px-3 py-2 text-right">
-        <Link className="text-sm font-semibold text-adentu-blue hover:underline" href={`/app/movimientos/${movement.id}`}>
-          Ver
-        </Link>
+        <div className="flex items-center justify-end gap-2">
+          {canCancelAndDelete ? (
+            <button
+              className="text-sm font-semibold text-red-700 hover:underline disabled:text-slate-400"
+              disabled={isPending}
+              onClick={cancelAndDelete}
+              type="button"
+            >
+              Borrar
+            </button>
+          ) : null}
+          <Link className="text-sm font-semibold text-adentu-blue hover:underline" href={`/app/movimientos/${movement.id}`}>
+            Ver
+          </Link>
+        </div>
       </td>
     </tr>
   );

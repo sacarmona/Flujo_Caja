@@ -25,7 +25,8 @@ export const movementInclude = {
     include: { bankAccount: true },
     orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }]
   },
-  project: true
+  project: true,
+  _count: { select: { reconciliations: true } }
 } satisfies Prisma.MovementInclude;
 
 export type MovementWithRelations = Prisma.MovementGetPayload<{ include: typeof movementInclude }>;

@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import type { MovementStatus } from "@prisma/client";
 import { generateRecurrenceOccurrences, dateKey } from "./recurrences";
 import { resolveConversionAllowManualFallback, type ExchangeRateProvider } from "./exchange-rates";
 
@@ -8,6 +9,16 @@ type RecurrenceServiceOptions = {
   holidays?: string[];
   months?: number;
 };
+
+export const preservedRecurrenceMovementStatuses = ["PAID_OR_COLLECTED", "PARTIALLY_PAID"] as const satisfies MovementStatus[];
+
+export function shouldPreserveRecurrenceMovement(status: MovementStatus): boolean {
+  return preservedRecurrenceMovementStatuses.includes(status as (typeof preservedRecurrenceMovementStatuses)[number]);
+}
+
+export function shouldRewriteRecurrenceMovement(status: MovementStatus): boolean {
+  return !shouldPreserveRecurrenceMovement(status);
+}
 
 export async function generateMovementsForRecurrence(ruleId: string, options: RecurrenceServiceOptions) {
   return options.prisma.$transaction(async (tx) => {

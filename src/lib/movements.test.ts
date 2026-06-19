@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertCanModifyMovements, parsePositiveDecimal, validateMovementInput } from "./movements";
+import { assertCanModifyMovements, canCancelAndDeleteMovement, parsePositiveDecimal, validateMovementInput } from "./movements";
 
 const baseInput = {
   type: "INCOME" as const,
@@ -72,5 +72,13 @@ describe("movement rules", () => {
 
   it("validates cancellation permissions with the same mutation rule", () => {
     expect(() => assertCanModifyMovements("MOVEMENT_ENTRY")).not.toThrow();
+  });
+
+  it("allows cancel and delete only for movements entered by mistake without financial activity", () => {
+    expect(canCancelAndDeleteMovement({ status: "PROJECTED", payments: [], _count: { reconciliations: 0 } })).toBe(true);
+    expect(canCancelAndDeleteMovement({ status: "PENDING", payments: [{}], _count: { reconciliations: 0 } })).toBe(false);
+    expect(canCancelAndDeleteMovement({ status: "PARTIALLY_PAID", payments: [], _count: { reconciliations: 0 } })).toBe(false);
+    expect(canCancelAndDeleteMovement({ status: "PAID_OR_COLLECTED", payments: [], _count: { reconciliations: 0 } })).toBe(false);
+    expect(canCancelAndDeleteMovement({ status: "PROJECTED", payments: [], _count: { reconciliations: 1 } })).toBe(false);
   });
 });

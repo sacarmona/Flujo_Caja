@@ -3,13 +3,14 @@
 import { Prisma } from "@prisma/client";
 import type { Currency, MovementStatus, MovementType, RecurrenceFrequency } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import type { ExchangeRateProvider } from "@/lib/exchange-rates";
+import { resolveConversionAllowManualFallback, type ExchangeRateProvider } from "@/lib/exchange-rates";
+import { generateRecurrenceOccurrences, dateKey } from "@/lib/recurrences";
 import {
   assertCanManageRecurrences,
   validateRecurrenceInput,
   type RecurrenceFormInput
 } from "@/lib/recurrence-rules";
-import { generateMovementsForRecurrence } from "@/lib/recurrence-service";
+import { generateMovementsForRecurrence, shouldPreserveRecurrenceMovement, shouldRewriteRecurrenceMovement } from "@/lib/recurrence-service";
 import { getCurrentUser } from "@/lib/auth";
 import { getHolidayKeys } from "@/lib/holidays-cl";
 import { prisma } from "@/lib/prisma";
@@ -146,13 +147,147 @@ export async function updateRecurrenceAction(formData: FormData) {
 
   const input = formInput(formData);
   const data = validateRecurrenceInput(input, await references(user.companyId, input));
-  const updated = await prisma.recurrenceRule.update({
-    where: { id },
-    data
+  const holidays = await getHolidayKeys(prisma);
+  await prisma.$transaction(async (tx) => {
+    const saved = await tx.recurrenceRule.update({
+      where: { id },
+      data
+    });
+
+    const movements = await tx.movement.findMany({
+      where: {
+        companyId: user.companyId,
+        recurrenceRuleId: id,
+        deletedAt: null
+      },
+      orderBy: [{ recurrenceOccurrenceDate: "asc" }, { projectedDate: "asc" }, { createdAt: "asc" }]
+    });
+    const preservedKeys = movements
+      .filter((movement) => shouldPreserveRecurrenceMovement(movement.status))
+      .map((movement) => movement.recurrenceOccurrenceDate)
+      .filter((date): date is Date => Boolean(date))
+      .map(dateKey);
+    const rewriteMovements = movements.filter((movement) => shouldRewriteRecurrenceMovement(movement.status));
+    const occurrences = generateRecurrenceOccurrences(
+      {
+        frequency: saved.frequency,
+        intervalDays: saved.intervalDays,
+        startDate: saved.startDate,
+        endDate: saved.endDate
+      },
+      {
+        holidays,
+        months: 12,
+        existingOccurrenceKeys: preservedKeys
+      }
+    );
+
+    if (rewriteMovements.length > 0) {
+      await tx.movement.updateMany({
+        where: { id: { in: rewriteMovements.map((movement) => movement.id) } },
+        data: { recurrenceOccurrenceDate: null }
+      });
+    }
+
+    for (const [index, movement] of rewriteMovements.entries()) {
+      const occurrence = occurrences[index];
+
+      if (!occurrence) {
+        const updatedMovement = await tx.movement.update({
+          where: { id: movement.id },
+          data: {
+            deletedAt: new Date(),
+            notes: movement.notes ?? "Eliminado por cambio de recurrencia."
+          }
+        });
+        await tx.auditLog.create({
+          data: {
+            companyId: user.companyId,
+            userId: user.id,
+            entity: "Movement",
+            entityId: movement.id,
+            action: "SOFT_DELETE",
+            before: JSON.parse(JSON.stringify(movement)),
+            after: JSON.parse(JSON.stringify(updatedMovement)),
+            metadata: {
+              source: "recurrence-series-update",
+              recurrenceRuleId: id
+            }
+          }
+        });
+        continue;
+      }
+
+      const conversion = await resolveConversionAllowManualFallback({
+        amount: saved.amount,
+        currency: saved.currency,
+        date: occurrence.projectedDate,
+        provider: new DatabaseExchangeRateProvider(user.companyId),
+        preferAutomatic: true
+      });
+
+      const updatedMovement = await tx.movement.update({
+        where: { id: movement.id },
+        data: {
+          recurrenceOccurrenceDate: occurrence.occurrenceDate,
+          businessUnitId: saved.businessUnitId,
+          accountingAccountId: saved.accountingAccountId,
+          bankAccountId: saved.bankAccountId,
+          projectId: saved.projectId,
+          costCenterId: saved.costCenterId,
+          type: saved.type,
+          status: saved.status,
+          description: saved.description,
+          amount: saved.amount,
+          currency: saved.currency,
+          projectedDate: occurrence.projectedDate,
+          realDate: null,
+          notes: saved.notes,
+          ...conversion
+        }
+      });
+      await tx.auditLog.create({
+        data: {
+          companyId: user.companyId,
+          userId: user.id,
+          entity: "Movement",
+          entityId: movement.id,
+          action: "UPDATE",
+          before: JSON.parse(JSON.stringify(movement)),
+          after: JSON.parse(JSON.stringify(updatedMovement)),
+          metadata: {
+            source: "recurrence-series-update",
+            recurrenceRuleId: id,
+            generatedAdditionalMovements: 0
+          }
+        }
+      });
+    }
+
+    await tx.auditLog.create({
+      data: {
+        companyId: user.companyId,
+        userId: user.id,
+        entity: "RecurrenceRule",
+        entityId: id,
+        action: "UPDATE",
+        before: JSON.parse(JSON.stringify(current)),
+        after: JSON.parse(JSON.stringify(saved)),
+        metadata: {
+          source: "recurrence-series-update",
+          rewrittenMovements: rewriteMovements.length,
+          preservedMovements: movements.length - rewriteMovements.length,
+          generatedAdditionalMovements: 0
+        }
+      }
+    });
+
+    return saved;
   });
 
-  await audit({ companyId: user.companyId, userId: user.id, entityId: id, action: "UPDATE", before: current, after: updated });
   revalidatePath("/app/recurrentes");
+  revalidatePath("/app/movimientos");
+  revalidatePath("/app/calendario");
 }
 
 export async function setRecurrenceActiveAction(formData: FormData) {
@@ -173,23 +308,74 @@ export async function setRecurrenceActiveAction(formData: FormData) {
     throw new Error("Debes confirmar la desactivacion.");
   }
 
-  const updated = await prisma.recurrenceRule.update({
-    where: { id },
-    data: {
-      isActive: active,
-      deactivatedAt: active ? null : new Date()
+  await prisma.$transaction(async (tx) => {
+    const saved = await tx.recurrenceRule.update({
+      where: { id },
+      data: {
+        isActive: active,
+        deactivatedAt: active ? null : new Date()
+      }
+    });
+
+    let softDeletedMovements = 0;
+    if (!active) {
+      const removableMovements = await tx.movement.findMany({
+        where: {
+          companyId: user.companyId,
+          recurrenceRuleId: id,
+          deletedAt: null,
+          status: { notIn: ["PAID_OR_COLLECTED", "PARTIALLY_PAID"] }
+        }
+      });
+      const deletedAt = new Date();
+
+      for (const movement of removableMovements) {
+        const updatedMovement = await tx.movement.update({
+          where: { id: movement.id },
+          data: { deletedAt }
+        });
+        await tx.auditLog.create({
+          data: {
+            companyId: user.companyId,
+            userId: user.id,
+            entity: "Movement",
+            entityId: movement.id,
+            action: "SOFT_DELETE",
+            before: JSON.parse(JSON.stringify(movement)),
+            after: JSON.parse(JSON.stringify(updatedMovement)),
+            metadata: {
+              source: "recurrence-deactivate",
+              recurrenceRuleId: id
+            }
+          }
+        });
+      }
+
+      softDeletedMovements = removableMovements.length;
     }
+
+    await tx.auditLog.create({
+      data: {
+        companyId: user.companyId,
+        userId: user.id,
+        entity: "RecurrenceRule",
+        entityId: id,
+        action: active ? "UPDATE" : "CANCEL",
+        before: JSON.parse(JSON.stringify(current)),
+        after: JSON.parse(JSON.stringify(saved)),
+        metadata: {
+          source: active ? "recurrence-reactivate" : "recurrence-deactivate",
+          softDeletedMovements
+        }
+      }
+    });
+
+    return saved;
   });
 
-  await audit({
-    companyId: user.companyId,
-    userId: user.id,
-    entityId: id,
-    action: active ? "UPDATE" : "CANCEL",
-    before: current,
-    after: updated
-  });
   revalidatePath("/app/recurrentes");
+  revalidatePath("/app/movimientos");
+  revalidatePath("/app/calendario");
 }
 
 export async function generateRecurringMovementsAction(formData: FormData) {
