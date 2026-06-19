@@ -1,60 +1,78 @@
-# cash_flow
+# Flujo de Caja — ADENTU Ingeniería SpA
 
-Aplicacion web de flujo de caja para ADENTU Ingeniería SpA.
+Aplicación web interna para registrar, proyectar, consultar y conciliar los ingresos y
+egresos de ADENTU Ingeniería SpA. Reemplaza gradualmente la planilla de control actual.
+
+Ver [`AGENTS.md`](./AGENTS.md) para las reglas técnicas obligatorias y
+[`docs/architecture.md`](./docs/architecture.md) para el diseño completo.
 
 ## Stack
 
-- Next.js
-- TypeScript
-- PostgreSQL
-- Prisma
-- Tailwind CSS
-- Vitest
+Next.js (App Router) · TypeScript estricto · PostgreSQL · Prisma · Tailwind CSS · NextAuth ·
+Zod · Vitest · Playwright · ESLint.
 
-## Configuracion
+Zona horaria: `America/Santiago`. Formato regional: `es-CL`. Moneda base: `CLP`.
 
-1. Copia `.env.example` a `.env`.
-2. Ajusta `DATABASE_URL` con tus credenciales de PostgreSQL.
-3. Opcionalmente define `OPENING_BALANCE_CLP` y `OPENING_BALANCE_DATE` para crear el saldo inicial de la Cuenta Corriente Santander.
-4. Instala dependencias:
+## Requisitos previos
+
+- Node.js 20+
+- PostgreSQL 15+ (local o remoto)
+
+## Instalación
 
 ```bash
 npm install
+cp .env.example .env
+# Editar .env con la URL real de PostgreSQL y un NEXTAUTH_SECRET generado con:
+# openssl rand -base64 32
 ```
 
-5. Genera el cliente Prisma:
+## Base de datos
 
 ```bash
-npm run prisma:generate
+npm run prisma:migrate     # crea/aplica migraciones en desarrollo
+npm run prisma:seed        # carga datos de demostración (empresa, plan de cuentas, usuarios demo)
 ```
 
-6. Ejecuta seed si necesitas cargar datos iniciales:
+Usuarios de demostración creados por el seed (contraseña `ChangeMe123!`, **no usar en
+producción**):
 
-```bash
-npm run db:seed
-```
+- `admin@adentu.cl` — rol ADMIN
+- `finanzas@adentu.cl` — rol FINANCE
 
-7. Ejecuta la aplicacion:
+## Ejecutar en desarrollo
 
 ```bash
 npm run dev
 ```
 
-## Scripts
+Abrir [http://localhost:3000](http://localhost:3000) e iniciar sesión en `/login`.
+
+## Pruebas
 
 ```bash
-npm run lint
-npm run typecheck
-npm run test
-npm run build
+npm run lint        # ESLint
+npm run typecheck   # tsc --noEmit
+npm run test        # pruebas unitarias (Vitest) — motor de recurrencias, permisos
+npm run test:e2e    # pruebas Playwright (requiere build previo)
 ```
 
-## Dominio
+## Build de producción
 
-- Empresa unica: ADENTU Ingeniería SpA.
-- Locale: `es-CL`.
-- Zona horaria: `America/Santiago`.
-- Moneda base: `CLP`.
-- Monedas permitidas: `CLP`, `UF`, `EUR`, `USD`.
-- Roles: `ADMIN`, `FINANCE`, `MOVEMENT_ENTRY`, `READ_ONLY`.
-- Plan de cuentas jerarquico editable por `ADMIN`.
+```bash
+npm run build
+npm run start
+```
+
+## Importación de la planilla de referencia
+
+La planilla `2026-06-17-cuenta-rapida-v2.xlsx` se guarda en `data/import/` solo como
+referencia histórica. No se modifica ni se depende de su estructura exacta: el asistente de
+importación (fase posterior) está diseñado para tolerar cambios de estructura.
+
+## Estado del proyecto
+
+Fase 1 completada: estructura base, modelo de datos completo, autenticación y roles,
+motor de recurrencias con pruebas unitarias, plan de cuentas y datos de demostración.
+Las vistas de calendario, semanal y de conciliación se implementarán en fases posteriores
+(ver "Pendiente para fases siguientes" en `docs/architecture.md`).
