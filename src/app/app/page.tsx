@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
-import { EmptyPage } from "@/components/empty-page";
 import {
   dateInputValue,
   firstNegativeBalanceDay,
   lastBusinessDayOfMonth,
   monthRange,
   netPendingBalanceForMonth,
-  parseDashboardDate
+  parseDashboardDate,
+  upcomingWeeklySummaries
 } from "@/lib/dashboard";
 import { formatCurrency, formatDate, todayInAppTimeZone } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
@@ -19,6 +19,10 @@ type AppHomePageProps = {
   searchParams: Promise<{ targetDate?: string }>;
 };
 
+function weekLabel(date: Date) {
+  return new Intl.DateTimeFormat("es-CL", { day: "2-digit", month: "2-digit" }).format(date);
+}
+
 export default async function AppHomePage({ searchParams }: AppHomePageProps) {
   const user = await getCurrentUser();
   if (!user) return null;
@@ -28,14 +32,24 @@ export default async function AppHomePage({ searchParams }: AppHomePageProps) {
   const holidays = await getHolidayKeys(prisma);
   const defaultTargetDate = lastBusinessDayOfMonth(today, holidays);
   const targetDate = parseDashboardDate(params.targetDate, defaultTargetDate);
-  const cashFlow = await calculateSantanderCashFlow({
-    prisma,
-    companyId: user.companyId,
-    startDate: today,
-    endDate: targetDate,
-    holidays
-  });
+  const [cashFlow, monthAheadCashFlow] = await Promise.all([
+    calculateSantanderCashFlow({
+      prisma,
+      companyId: user.companyId,
+      startDate: today,
+      endDate: targetDate,
+      holidays
+    }),
+    calculateSantanderCashFlow({
+      prisma,
+      companyId: user.companyId,
+      startDate: today,
+      months: 1,
+      holidays
+    })
+  ]);
   const projectedBalance = cashFlow.days.at(-1)?.accumulatedBalance ?? cashFlow.openingBalance;
+  const weeklySummaries = upcomingWeeklySummaries(monthAheadCashFlow, 4);
   const currentMonth = monthRange(today);
   const pendingMovements = await prisma.movement.findMany({
     where: {
@@ -107,10 +121,46 @@ export default async function AppHomePage({ searchParams }: AppHomePageProps) {
         </div>
       </div>
       <div className="mt-8">
-        <EmptyPage
-          description="La pantalla de resumen queda lista para conectar indicadores cuando se definan los flujos operativos."
-          title="Panel principal"
-        />
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-lg font-semibold text-adentu-ink">Proximas semanas</h2>
+          <Link className="text-sm font-semibold text-adentu-blue" href="/app/calendario">
+            Ver Calendario completo
+          </Link>
+        </div>
+        {weeklySummaries.length > 0 ? (
+          <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-adentu-mist">
+                  <th className="px-3 py-2 text-left font-semibold text-adentu-ink">Semana</th>
+                  <th className="px-3 py-2 text-right font-semibold text-adentu-ink">Ingresos</th>
+                  <th className="px-3 py-2 text-right font-semibold text-adentu-ink">Egresos</th>
+                  <th className="px-3 py-2 text-right font-semibold text-adentu-ink">Flujo neto</th>
+                  <th className="px-3 py-2 text-right font-semibold text-adentu-ink">Saldo al cierre</th>
+                </tr>
+              </thead>
+              <tbody>
+                {weeklySummaries.map((week) => (
+                  <tr className="border-t border-slate-200" key={dateInputValue(week.weekStart)}>
+                    <td className="px-3 py-2 text-left font-medium text-adentu-ink">
+                      {weekLabel(week.weekStart)} - {weekLabel(week.weekEnd)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-adentu-teal">{formatCurrency(Number(week.income))}</td>
+                    <td className="px-3 py-2 text-right text-red-700">{formatCurrency(Number(week.expense))}</td>
+                    <td className={`px-3 py-2 text-right font-medium ${week.netFlow.isNegative() ? "text-red-700" : "text-adentu-ink"}`}>
+                      {formatCurrency(Number(week.netFlow))}
+                    </td>
+                    <td className={`px-3 py-2 text-right font-semibold ${week.endingBalance.isNegative() ? "text-red-700" : "text-adentu-ink"}`}>
+                      {formatCurrency(Number(week.endingBalance))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-slate-600">No hay dias habiles proyectados en las proximas semanas.</p>
+        )}
       </div>
     </section>
   );

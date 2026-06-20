@@ -5,10 +5,27 @@ import {
   lastBusinessDayOfMonth,
   monthRange,
   netPendingBalanceForMonth,
-  parseDashboardDate
+  parseDashboardDate,
+  upcomingWeeklySummaries
 } from "./dashboard";
 import { dateKey } from "./recurrences";
-import type { CashFlowDay } from "./cash-flow";
+import { calculateCashFlowByBusinessDay, type CashFlowDay } from "./cash-flow";
+
+const incomeAccount = { id: "acc-income", name: "Servicios", code: "1.01", parent: { id: "cat-income", name: "Ingresos" } };
+const expenseAccount = { id: "acc-expense", name: "Software", code: "3.05", parent: { id: "cat-admin", name: "Gastos administrativos" } };
+const unit = { id: "unit-ops", name: "Inspecciones" };
+
+const baseMovement = {
+  status: "PENDING" as const,
+  currency: "CLP" as const,
+  deletedAt: null,
+  cancelledAt: null,
+  payments: []
+};
+
+function isoDate(value: string) {
+  return new Date(`${value}T00:00:00.000`);
+}
 
 function zero() {
   return new Prisma.Decimal(0);
@@ -77,5 +94,64 @@ describe("dashboard helpers", () => {
     const days = [day(new Date(2026, 5, 19), 619181), day(new Date(2026, 5, 22), 1000)];
 
     expect(firstNegativeBalanceDay(days)).toBeNull();
+  });
+
+  it("summarizes upcoming weeks with income, expense, net flow and ending balance", () => {
+    const result = calculateCashFlowByBusinessDay(
+      [
+        {
+          ...baseMovement,
+          id: "income-week1",
+          type: "INCOME" as const,
+          projectedDate: isoDate("2026-06-15"),
+          projectedAmountClp: "10000",
+          accountingAccountId: incomeAccount.id,
+          businessUnitId: unit.id,
+          accountingAccount: incomeAccount,
+          businessUnit: unit
+        },
+        {
+          ...baseMovement,
+          id: "expense-week1",
+          type: "EXPENSE" as const,
+          projectedDate: isoDate("2026-06-17"),
+          projectedAmountClp: "4000",
+          accountingAccountId: expenseAccount.id,
+          businessUnitId: unit.id,
+          accountingAccount: expenseAccount,
+          businessUnit: unit
+        },
+        {
+          ...baseMovement,
+          id: "income-week2",
+          type: "INCOME" as const,
+          projectedDate: isoDate("2026-06-22"),
+          projectedAmountClp: "5000",
+          accountingAccountId: incomeAccount.id,
+          businessUnitId: unit.id,
+          accountingAccount: incomeAccount,
+          businessUnit: unit
+        }
+      ],
+      [],
+      { startDate: isoDate("2026-06-15"), endDate: isoDate("2026-06-26") }
+    );
+
+    const summaries = upcomingWeeklySummaries(result, 4);
+
+    expect(summaries).toHaveLength(2);
+    expect(summaries[0].income.toString()).toBe("10000");
+    expect(summaries[0].expense.toString()).toBe("4000");
+    expect(summaries[0].netFlow.toString()).toBe("6000");
+    expect(summaries[0].endingBalance.toString()).toBe("6000");
+    expect(summaries[1].income.toString()).toBe("5000");
+    expect(summaries[1].netFlow.toString()).toBe("5000");
+    expect(summaries[1].endingBalance.toString()).toBe("11000");
+  });
+
+  it("limits the number of weeks returned", () => {
+    const result = calculateCashFlowByBusinessDay([], [], { startDate: isoDate("2026-06-15"), endDate: isoDate("2026-07-10") });
+
+    expect(upcomingWeeklySummaries(result, 2)).toHaveLength(2);
   });
 });

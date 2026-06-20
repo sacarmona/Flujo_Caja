@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import type { MovementType } from "@prisma/client";
 import { dateKey, isBusinessDay } from "./recurrences";
-import type { CashFlowDay } from "./cash-flow";
+import type { CashFlowDay, CashFlowResult } from "./cash-flow";
 
 export type PendingMovementSummary = {
   type: MovementType;
@@ -50,4 +50,30 @@ export function netPendingBalanceForMonth(movements: PendingMovementSummary[]): 
 
 export function firstNegativeBalanceDay(days: CashFlowDay[]): CashFlowDay | null {
   return days.find((day) => day.accumulatedBalance.isNegative()) ?? null;
+}
+
+export type WeeklySummary = {
+  weekStart: Date;
+  weekEnd: Date;
+  income: Prisma.Decimal;
+  expense: Prisma.Decimal;
+  netFlow: Prisma.Decimal;
+  endingBalance: Prisma.Decimal;
+};
+
+/** Mismas semanas que muestra el Calendario (lunes a viernes), con el saldo acumulado al cierre de cada una. */
+export function upcomingWeeklySummaries(result: CashFlowResult, limit = 4): WeeklySummary[] {
+  return result.weeks.slice(0, limit).map((week) => {
+    const daysInWeek = result.days.filter((day) => day.date >= week.weekStart && day.date <= week.weekEnd);
+    const lastDay = daysInWeek.at(-1);
+
+    return {
+      weekStart: week.weekStart,
+      weekEnd: week.weekEnd,
+      income: week.projectedIncome.plus(week.realIncome),
+      expense: week.projectedExpense.plus(week.realExpense),
+      netFlow: week.netFlow,
+      endingBalance: lastDay?.accumulatedBalance ?? result.openingBalance
+    };
+  });
 }
