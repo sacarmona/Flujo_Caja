@@ -1,11 +1,35 @@
+import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
+  firstNegativeBalanceDay,
   lastBusinessDayOfMonth,
   monthRange,
   netPendingBalanceForMonth,
   parseDashboardDate
 } from "./dashboard";
 import { dateKey } from "./recurrences";
+import type { CashFlowDay } from "./cash-flow";
+
+function zero() {
+  return new Prisma.Decimal(0);
+}
+
+function day(date: Date, accumulatedBalance: number): CashFlowDay {
+  return {
+    date,
+    projectedIncome: zero(),
+    projectedExpense: zero(),
+    realIncome: zero(),
+    realExpense: zero(),
+    fullProjectedIncome: zero(),
+    fullProjectedExpense: zero(),
+    netFlow: zero(),
+    accumulatedBalance: new Prisma.Decimal(accumulatedBalance),
+    byCategory: {},
+    byAccountingAccount: {},
+    byBusinessUnit: {}
+  };
+}
 
 describe("dashboard helpers", () => {
   it("uses the last business day of the month by default", () => {
@@ -34,5 +58,24 @@ describe("dashboard helpers", () => {
         { type: "EXPENSE", projectedAmountClp: "350000" }
       ]).toString()
     ).toBe("850000");
+  });
+
+  it("finds the first day where the accumulated balance turns negative", () => {
+    const days = [
+      day(new Date(2026, 5, 19), 619181),
+      day(new Date(2026, 5, 22), -100000),
+      day(new Date(2026, 5, 23), -50000)
+    ];
+
+    const negativeDay = firstNegativeBalanceDay(days);
+
+    expect(negativeDay?.date).toEqual(new Date(2026, 5, 22));
+    expect(negativeDay?.accumulatedBalance.toString()).toBe("-100000");
+  });
+
+  it("returns null when no day has a negative balance", () => {
+    const days = [day(new Date(2026, 5, 19), 619181), day(new Date(2026, 5, 22), 1000)];
+
+    expect(firstNegativeBalanceDay(days)).toBeNull();
   });
 });

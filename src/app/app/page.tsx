@@ -1,5 +1,14 @@
+import Link from "next/link";
+import { AlertTriangle } from "lucide-react";
 import { EmptyPage } from "@/components/empty-page";
-import { dateInputValue, lastBusinessDayOfMonth, monthRange, netPendingBalanceForMonth, parseDashboardDate } from "@/lib/dashboard";
+import {
+  dateInputValue,
+  firstNegativeBalanceDay,
+  lastBusinessDayOfMonth,
+  monthRange,
+  netPendingBalanceForMonth,
+  parseDashboardDate
+} from "@/lib/dashboard";
 import { formatCurrency, formatDate, todayInAppTimeZone } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { calculateSantanderCashFlow } from "@/lib/cash-flow-service";
@@ -45,6 +54,7 @@ export default async function AppHomePage({ searchParams }: AppHomePageProps) {
     }
   });
   const pendingBalance = netPendingBalanceForMonth(pendingMovements);
+  const negativeDay = firstNegativeBalanceDay(cashFlow.days);
 
   return (
     <section className="max-w-5xl">
@@ -54,6 +64,18 @@ export default async function AppHomePage({ searchParams }: AppHomePageProps) {
           Vista inicial preparada para consolidar saldos, vencimientos y alertas de caja en CLP.
         </p>
       </div>
+      {negativeDay ? (
+        <Link
+          className="mt-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 transition hover:border-red-300"
+          href="/app/calendario"
+        >
+          <AlertTriangle aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-red-700" />
+          <p className="text-sm text-red-800">
+            <span className="font-semibold">Saldo negativo proyectado:</span> el {formatDate(negativeDay.date)} el saldo acumulado caeria a{" "}
+            {formatCurrency(Number(negativeDay.accumulatedBalance))}. Ver detalle en Calendario.
+          </p>
+        </Link>
+      ) : null}
       <div className="mt-8 grid gap-4 md:grid-cols-3">
         <div className="rounded-lg border border-slate-200 bg-white p-5">
           <p className="text-sm text-slate-500">Saldo proyectado</p>

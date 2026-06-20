@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import type { MovementType } from "@prisma/client";
 import { dateKey, isBusinessDay } from "./recurrences";
+import type { CashFlowDay } from "./cash-flow";
 
 export type PendingMovementSummary = {
   type: MovementType;
@@ -45,4 +46,8 @@ export function netPendingBalanceForMonth(movements: PendingMovementSummary[]): 
     const amount = new Prisma.Decimal(movement.projectedAmountClp);
     return movement.type === "INCOME" ? total.plus(amount) : total.minus(amount);
   }, new Prisma.Decimal(0));
+}
+
+export function firstNegativeBalanceDay(days: CashFlowDay[]): CashFlowDay | null {
+  return days.find((day) => day.accumulatedBalance.isNegative()) ?? null;
 }
