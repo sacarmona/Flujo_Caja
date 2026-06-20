@@ -8,6 +8,7 @@ import {
   updateRecurrenceAction
 } from "@/app/app/recurrentes/actions";
 import { RecurrenceForm } from "@/app/app/recurrentes/recurrence-form";
+import { RecurrenceImportForm } from "@/app/app/recurrentes/recurrence-import-form";
 import { typeLabels } from "@/app/app/movimientos/shared";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
@@ -204,6 +205,26 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
           Solo ADMIN y FINANCE pueden administrar recurrencias.
         </p>
       )}
+
+      {canManage ? (
+        <details className="mt-4 group">
+          <summary className="cursor-pointer list-none text-lg font-semibold text-adentu-ink">
+            <span className="inline-flex items-center gap-2">
+              <span className="text-adentu-blue transition-transform group-open:rotate-90">▶</span>
+              Importar recurrencias desde Excel/CSV
+            </span>
+          </summary>
+          <div className="mt-3 rounded-lg border border-slate-200 bg-white p-4">
+            <p className="text-sm text-slate-600">
+              Sube un archivo CSV o XLSX con la plantilla, previsualiza las filas validas y con error, y confirma para crear las
+              reglas de una vez.
+            </p>
+            <div className="mt-3">
+              <RecurrenceImportForm />
+            </div>
+          </div>
+        </details>
+      ) : null}
 
       <div className="mt-10 space-y-4">
         <div className="flex items-center justify-between gap-4">

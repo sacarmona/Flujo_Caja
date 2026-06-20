@@ -11,6 +11,8 @@ import {
   type RecurrenceFormInput
 } from "@/lib/recurrence-rules";
 import { generateMovementsForRecurrence, shouldPreserveRecurrenceMovement, shouldRewriteRecurrenceMovement } from "@/lib/recurrence-service";
+import { parseRecurrenceImportFile, resolveRecurrenceImportRow, type RecurrenceImportReferenceData } from "@/lib/recurrence-import";
+import type { RecurrenceImportState } from "@/lib/recurrence-import-state";
 import { getCurrentUser } from "@/lib/auth";
 import { getHolidayKeys } from "@/lib/holidays-cl";
 import { prisma } from "@/lib/prisma";
@@ -135,6 +137,107 @@ export async function createRecurrenceAction(formData: FormData) {
 
   await audit({ companyId: user.companyId, userId: user.id, entityId: created.id, action: "CREATE", after: created });
   revalidatePath("/app/recurrentes");
+}
+
+async function loadImportReferenceData(companyId: string): Promise<RecurrenceImportReferenceData> {
+  const [accounts, bankAccounts, businessUnits, projects, costCenters] = await Promise.all([
+    prisma.accountingAccount.findMany({
+      where: { companyId, isActive: true, allowMovements: true, deletedAt: null, children: { none: {} } },
+      include: { _count: { select: { children: true } } }
+    }),
+    prisma.bankAccount.findMany({ where: { companyId, isActive: true, deletedAt: null } }),
+    prisma.businessUnit.findMany({ where: { companyId, isActive: true, deletedAt: null } }),
+    prisma.project.findMany({ where: { companyId, isActive: true, deletedAt: null } }),
+    prisma.costCenter.findMany({ where: { companyId, isActive: true, deletedAt: null } })
+  ]);
+
+  return { accounts, bankAccounts, businessUnits, projects, costCenters };
+}
+
+export async function previewRecurrenceImportAction(
+  _prevState: RecurrenceImportState,
+  formData: FormData
+): Promise<RecurrenceImportState> {
+  const user = await requireRecurrenceManager();
+  const file = formData.get("file");
+
+  if (!(file instanceof File) || file.size === 0) {
+    return { status: "error", message: "Selecciona un archivo CSV o XLSX para importar." };
+  }
+
+  let rawRows;
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    rawRows = await parseRecurrenceImportFile(buffer, file.name);
+  } catch {
+    return { status: "error", message: "No se pudo leer el archivo. Verifica que sea un CSV o XLSX valido." };
+  }
+
+  if (rawRows.length === 0) {
+    return { status: "error", message: "El archivo no tiene filas para importar." };
+  }
+
+  const refs = await loadImportReferenceData(user.companyId);
+  const results = rawRows.map((raw, index) => resolveRecurrenceImportRow(raw, index + 2, refs));
+  const validCount = results.filter((result) => result.status === "ok").length;
+
+  return {
+    status: "previewed",
+    fileName: file.name,
+    results,
+    validCount,
+    errorCount: results.length - validCount
+  };
+}
+
+export async function commitRecurrenceImportAction(
+  _prevState: RecurrenceImportState,
+  formData: FormData
+): Promise<RecurrenceImportState> {
+  const user = await requireRecurrenceManager();
+  const rowsJson = stringValue(formData, "rows");
+
+  if (!rowsJson) {
+    return { status: "error", message: "No hay filas validas para importar." };
+  }
+
+  let inputs: RecurrenceFormInput[];
+  try {
+    inputs = JSON.parse(rowsJson);
+  } catch {
+    return { status: "error", message: "Los datos a importar son invalidos." };
+  }
+
+  const refs = await loadImportReferenceData(user.companyId);
+  const rowErrors: string[] = [];
+  let created = 0;
+
+  for (const [index, input] of inputs.entries()) {
+    try {
+      const account = refs.accounts.find((item) => item.id === input.accountingAccountId);
+      const bankAccount = refs.bankAccounts.find((item) => item.id === input.bankAccountId);
+      const businessUnit = refs.businessUnits.find((item) => item.id === input.businessUnitId);
+      const project = input.projectId ? refs.projects.find((item) => item.id === input.projectId) ?? null : null;
+      const costCenter = input.costCenterId ? refs.costCenters.find((item) => item.id === input.costCenterId) ?? null : null;
+      const data = validateRecurrenceInput(input, { accountingAccount: account, bankAccount, businessUnit, project, costCenter });
+      const createdRule = await prisma.recurrenceRule.create({ data: { companyId: user.companyId, ...data } });
+      await audit({ companyId: user.companyId, userId: user.id, entityId: createdRule.id, action: "CREATE", after: createdRule });
+      created += 1;
+    } catch (error) {
+      rowErrors.push(`Fila ${index + 1}: ${error instanceof Error ? error.message : "error desconocido."}`);
+    }
+  }
+
+  revalidatePath("/app/recurrentes");
+
+  return {
+    status: "committed",
+    createdCount: created,
+    message:
+      rowErrors.length > 0
+        ? `Se crearon ${created} reglas. Filas con error: ${rowErrors.join(" | ")}`
+        : `Se crearon ${created} reglas correctamente.`
+  };
 }
 
 export async function updateRecurrenceAction(formData: FormData) {
