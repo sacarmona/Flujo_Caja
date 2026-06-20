@@ -20,7 +20,7 @@ import { getHolidayKeys } from "@/lib/holidays-cl";
 import { movementCurrencies, movementStatuses, movementTypes } from "@/lib/movements";
 import { canManageOpeningBalances, dateInputValue, suggestedOpeningBalanceWeek } from "@/lib/opening-balances";
 import { prisma } from "@/lib/prisma";
-import { updateOpeningBalanceAction } from "./actions";
+import { removeOpeningBalanceAction, updateOpeningBalanceAction } from "./actions";
 
 type SearchParams = {
   months?: string;
@@ -144,6 +144,7 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
   const weeks = groupDaysByWeek(result.days);
   const balances = calendarAccumulatedBalances(result.days, mode, result.openingBalance, result.confirmedBalances);
   const suggestedOpening = suggestedOpeningBalanceWeek(result, weeks);
+  const confirmedForSuggestedWeek = suggestedOpening ? result.confirmedBalances.get(dateKey(suggestedOpening.date)) : undefined;
   const canEditOpeningBalance = canManageOpeningBalances(user.role);
 
   return (
@@ -241,27 +242,46 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
                 Semana {dateLabel(suggestedOpening.date)} calculada en {formatCurrency(Number(suggestedOpening.amount))}
               </p>
             ) : null}
+            {confirmedForSuggestedWeek ? (
+              <p className="mt-1 text-xs font-medium text-amber-700">
+                Saldo confirmado/actualizado para esa semana: {formatCurrency(Number(confirmedForSuggestedWeek))}
+                {!confirmedForSuggestedWeek.eq(suggestedOpening?.amount ?? 0) ? " (distinto del calculado)" : null}
+              </p>
+            ) : null}
           </div>
         </div>
 
         {canEditOpeningBalance ? (
           <div className="grid gap-3 md:grid-cols-[auto_1fr]">
             {suggestedOpening ? (
-              <form action={updateOpeningBalanceAction} className="flex flex-wrap items-end gap-2">
-                <input type="hidden" name="balanceDate" value={dateInputValue(suggestedOpening.date)} />
-                <input type="hidden" name="amount" value={suggestedOpening.amount.toFixed(2)} />
-                <input
-                  type="hidden"
-                  name="note"
-                  value={`Saldo confirmado desde Calendario para la semana ${dateInputValue(suggestedOpening.date)}.`}
-                />
-                <button
-                  className="rounded-md border border-adentu-blue px-3 py-2 text-sm font-semibold text-adentu-blue transition hover:bg-adentu-mist"
-                  type="submit"
-                >
-                  Confirmar calculado
-                </button>
-              </form>
+              <div className="flex flex-wrap items-end gap-2">
+                <form action={updateOpeningBalanceAction} className="flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="balanceDate" value={dateInputValue(suggestedOpening.date)} />
+                  <input type="hidden" name="amount" value={suggestedOpening.amount.toFixed(2)} />
+                  <input
+                    type="hidden"
+                    name="note"
+                    value={`Saldo confirmado desde Calendario para la semana ${dateInputValue(suggestedOpening.date)}.`}
+                  />
+                  <button
+                    className="rounded-md border border-adentu-blue px-3 py-2 text-sm font-semibold text-adentu-blue transition hover:bg-adentu-mist"
+                    type="submit"
+                  >
+                    Confirmar calculado
+                  </button>
+                </form>
+                {confirmedForSuggestedWeek ? (
+                  <form action={removeOpeningBalanceAction}>
+                    <input type="hidden" name="balanceDate" value={dateInputValue(suggestedOpening.date)} />
+                    <button
+                      className="rounded-md border border-amber-600 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-50"
+                      type="submit"
+                    >
+                      Quitar saldo confirmado
+                    </button>
+                  </form>
+                ) : null}
+              </div>
             ) : null}
             <form action={updateOpeningBalanceAction} className="grid gap-2 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(10rem,1fr)_auto]">
               <label className="text-sm">
