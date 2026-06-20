@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import type { MovementStatus, MovementType } from "@prisma/client";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, todayInAppTimeZone } from "@/lib/format";
 
 export const typeLabels: Record<MovementType, string> = {
   INCOME: "Ingreso",
@@ -40,7 +40,7 @@ export function dateInputValue(date: Date | null) {
 }
 
 export function todayInputValue(): string {
-  const now = new Date();
+  const now = todayInAppTimeZone();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");

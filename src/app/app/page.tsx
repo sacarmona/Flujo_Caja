@@ -1,6 +1,6 @@
 import { EmptyPage } from "@/components/empty-page";
 import { dateInputValue, lastBusinessDayOfMonth, monthRange, netPendingBalanceForMonth, parseDashboardDate } from "@/lib/dashboard";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, todayInAppTimeZone } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { calculateSantanderCashFlow } from "@/lib/cash-flow-service";
 import { getHolidayKeys } from "@/lib/holidays-cl";
@@ -10,16 +10,12 @@ type AppHomePageProps = {
   searchParams: Promise<{ targetDate?: string }>;
 };
 
-function dateOnly(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
 export default async function AppHomePage({ searchParams }: AppHomePageProps) {
   const user = await getCurrentUser();
   if (!user) return null;
 
   const params = await searchParams;
-  const today = dateOnly(new Date());
+  const today = todayInAppTimeZone();
   const holidays = await getHolidayKeys(prisma);
   const defaultTargetDate = lastBusinessDayOfMonth(today, holidays);
   const targetDate = parseDashboardDate(params.targetDate, defaultTargetDate);

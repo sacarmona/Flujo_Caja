@@ -14,7 +14,7 @@ import {
   type CalendarMode
 } from "@/lib/calendar-view";
 import { dateKey } from "@/lib/recurrences";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, todayInAppTimeZone } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { getHolidayKeys } from "@/lib/holidays-cl";
 import { movementCurrencies, movementStatuses, movementTypes } from "@/lib/movements";
@@ -116,7 +116,7 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
 
   const months = calendarMonths(filters.months);
   const mode = calendarMode(filters.mode);
-  const startDate = new Date();
+  const startDate = todayInAppTimeZone();
   const collapsed = new Set((filters.collapsed ?? "").split("|").filter(Boolean));
   const [referenceData, holidays] = await Promise.all([getReferenceData(user.companyId), getHolidayKeys(prisma)]);
   const result = await calculateSantanderCashFlow({
@@ -325,8 +325,12 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr className={row.kind === "summary" ? "bg-slate-50 font-semibold" : "hover:bg-slate-50"} key={row.key}>
-                <th className="sticky left-0 z-10 min-w-64 border-r border-t border-slate-200 bg-inherit px-3 py-2 text-left">
+              <tr className={row.kind === "summary" ? "bg-slate-50 font-semibold" : "bg-white hover:bg-slate-50"} key={row.key}>
+                <th
+                  className={`sticky left-0 z-10 min-w-64 border-r border-t border-slate-200 px-3 py-2 text-left ${
+                    row.kind === "summary" ? "bg-slate-50" : "bg-white"
+                  }`}
+                >
                   <div className="flex items-center gap-2" style={{ paddingLeft: row.level * 16 }}>
                     {row.kind === "category" && row.categoryName ? (
                       <Link className="rounded border border-slate-300 px-1.5 py-0.5 text-xs" href={toggleCollapsedHref(row.categoryName, filters, collapsed)}>

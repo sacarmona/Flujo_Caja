@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { formatCurrency, formatDate } from "./format";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { formatCurrency, formatDate, todayInAppTimeZone } from "./format";
 
 describe("format helpers", () => {
   it("formats CLP amounts using es-CL", () => {
@@ -8,5 +8,35 @@ describe("format helpers", () => {
 
   it("formats dates in the configured locale", () => {
     expect(formatDate(new Date("2026-06-18T12:00:00.000Z"))).toContain("2026");
+  });
+
+  describe("todayInAppTimeZone", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("usa la fecha de America/Santiago aunque el servidor corra en UTC", () => {
+      // 02:00 UTC del 20-06 es todavia 19-06 22:00 en Santiago (UTC-4).
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-20T02:00:00.000Z"));
+
+      const today = todayInAppTimeZone();
+
+      expect(today.getFullYear()).toBe(2026);
+      expect(today.getMonth()).toBe(5);
+      expect(today.getDate()).toBe(19);
+    });
+
+    it("avanza al dia siguiente una vez pasada la medianoche en Santiago", () => {
+      // 04:30 UTC del 20-06 ya es 20-06 00:30 en Santiago.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-20T04:30:00.000Z"));
+
+      const today = todayInAppTimeZone();
+
+      expect(today.getFullYear()).toBe(2026);
+      expect(today.getMonth()).toBe(5);
+      expect(today.getDate()).toBe(20);
+    });
   });
 });
