@@ -59,6 +59,37 @@ const frequencyByLabel: Record<string, RecurrenceFrequency> = {
   anual: "ANNUAL"
 };
 
+/**
+ * El dia/dia de la semana de cada ocurrencia se calcula a partir de la
+ * Fecha de inicio (mismo dia de cada mes/semana, ajustado al ultimo dia
+ * del mes si no existe). Solo "Cada N dias" usa un campo adicional
+ * (Intervalo dias); "Dia del mes" y "Dia de la semana" son informativos y
+ * no afectan el calculo. Estas notas se vuelcan en la hoja "Frecuencias"
+ * de la plantilla para que el usuario no las llene pensando que son
+ * obligatorias.
+ */
+const recurrenceFrequencyGuide: Array<{ label: string; description: string }> = [
+  { label: "Diaria", description: "Una ocurrencia cada dia, incluyendo fines de semana y feriados." },
+  { label: "Dias habiles", description: "Solo lunes a viernes, sin feriados. No requiere campos adicionales." },
+  {
+    label: "Cada N dias",
+    description: "Cada N dias desde la Fecha de inicio. Requiere 'Intervalo dias' (numero entero positivo)."
+  },
+  {
+    label: "Semanal",
+    description: "Cada 7 dias desde la Fecha de inicio. El dia de la semana lo define la Fecha de inicio; no es necesario llenar 'Dia de la semana'."
+  },
+  { label: "Quincenal", description: "Cada 15 dias desde la Fecha de inicio." },
+  {
+    label: "Mensual",
+    description:
+      "Cada mes, en el mismo dia que la Fecha de inicio (si ese dia no existe en un mes, se ajusta al ultimo dia). No es necesario llenar 'Dia del mes'."
+  },
+  { label: "Trimestral", description: "Cada 3 meses, mismo dia que la Fecha de inicio." },
+  { label: "Semestral", description: "Cada 6 meses, mismo dia que la Fecha de inicio." },
+  { label: "Anual", description: "Cada 12 meses, mismo dia que la Fecha de inicio." }
+];
+
 export type RecurrenceImportRawRow = Record<string, string>;
 
 export type RecurrenceImportReferenceData = {
@@ -350,6 +381,14 @@ export async function buildRecurrenceImportTemplateBuffer(accounts: RecurrenceIm
   accountsSheet.columns.forEach((column) => {
     column.width = 32;
   });
+
+  const frequencySheet = workbook.addWorksheet("Frecuencias");
+  frequencySheet.addRow(["Frecuencia", "Como funciona"]);
+  frequencySheet.getRow(1).font = { bold: true };
+  recurrenceFrequencyGuide.forEach((item) => frequencySheet.addRow([item.label, item.description]));
+  frequencySheet.getColumn(1).width = 18;
+  frequencySheet.getColumn(2).width = 90;
+  frequencySheet.getColumn(2).alignment = { wrapText: true };
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
