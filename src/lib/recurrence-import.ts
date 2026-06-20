@@ -326,8 +326,15 @@ export function resolveRecurrenceImportRow(
   return { rowNumber, status: "ok", input, summary: `${description} - ${amountText} ${currencyText}` };
 }
 
-export async function buildRecurrenceImportTemplateBuffer(): Promise<Buffer> {
+export type RecurrenceImportAccountReference = {
+  code: string;
+  name: string;
+  category: string;
+};
+
+export async function buildRecurrenceImportTemplateBuffer(accounts: RecurrenceImportAccountReference[] = []): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
+
   const sheet = workbook.addWorksheet("Recurrencias");
   sheet.addRow([...recurrenceImportColumns]);
   sheet.addRow(recurrenceImportExampleRow);
@@ -335,6 +342,15 @@ export async function buildRecurrenceImportTemplateBuffer(): Promise<Buffer> {
   sheet.columns.forEach((column) => {
     column.width = 30;
   });
+
+  const accountsSheet = workbook.addWorksheet("Cuentas contables");
+  accountsSheet.addRow(["Codigo", "Nombre", "Categoria"]);
+  accountsSheet.getRow(1).font = { bold: true };
+  accounts.forEach((account) => accountsSheet.addRow([account.code, account.name, account.category]));
+  accountsSheet.columns.forEach((column) => {
+    column.width = 32;
+  });
+
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
 }
