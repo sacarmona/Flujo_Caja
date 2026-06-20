@@ -8,10 +8,18 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+/**
+ * Las fechas que recibe (projectedDate, paidAt, startDate, etc.) son dias de
+ * calendario construidos con new Date(year, month, day) en la zona horaria
+ * del proceso, sin hora real asociada. Forzar timeZone: APP_TIME_ZONE aqui
+ * reinterpretaria ese instante en Chile, lo que en un servidor que corre en
+ * UTC (Vercel) podia retroceder un dia (ej. mostrar 25/6 en vez de 26/6). Sin
+ * timeZone, Intl usa la zona del proceso, la misma con la que se construyo
+ * la fecha, igual que dateLabel() en el Calendario.
+ */
 export function formatDate(date: Date): string {
   return new Intl.DateTimeFormat(APP_LOCALE, {
-    dateStyle: "medium",
-    timeZone: APP_TIME_ZONE
+    dateStyle: "medium"
   }).format(date);
 }
 

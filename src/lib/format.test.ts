@@ -10,6 +10,13 @@ describe("format helpers", () => {
     expect(formatDate(new Date("2026-06-18T12:00:00.000Z"))).toContain("2026");
   });
 
+  it("muestra el mismo dia de calendario con que se construyo la fecha, sin reinterpretarla por zona horaria", () => {
+    // projectedDate/paidAt/etc se construyen con new Date(year, month, day) en
+    // la zona del proceso; formatDate no debe forzar otra zona (ver comentario
+    // en format.ts) o en un servidor en UTC se puede mostrar el dia anterior.
+    expect(formatDate(new Date(2026, 5, 26))).toContain("26");
+  });
+
   describe("todayInAppTimeZone", () => {
     afterEach(() => {
       vi.useRealTimers();
