@@ -44,6 +44,11 @@ describe("opening balance helpers", () => {
     expect(() => parseOpeningBalanceAmount("")).toThrow("obligatorio");
   });
 
+  it("parses montos con coma decimal sin confundirla con separador de miles", () => {
+    expect(parseOpeningBalanceAmount("619181,00").toFixed(0)).toBe("619181");
+    expect(parseOpeningBalanceAmount("619181,37").toFixed(2)).toBe("619181.37");
+  });
+
   it("calculates the opening balance for a later visible week", () => {
     const days = [
       day(new Date(2026, 5, 19), -399000, -399000),

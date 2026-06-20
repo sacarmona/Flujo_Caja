@@ -257,7 +257,8 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
               <div className="flex flex-wrap items-end gap-2">
                 <form action={updateOpeningBalanceAction} className="flex flex-wrap items-end gap-2">
                   <input type="hidden" name="balanceDate" value={dateInputValue(suggestedOpening.date)} />
-                  <input type="hidden" name="amount" value={suggestedOpening.amount.toFixed(2)} />
+                  {/* parseOpeningBalanceAmount espera coma decimal (formato chileno); un punto crudo se confunde con separador de miles y multiplica el monto por 100. */}
+                  <input type="hidden" name="amount" value={suggestedOpening.amount.toFixed(2).replace(".", ",")} />
                   <input
                     type="hidden"
                     name="note"
