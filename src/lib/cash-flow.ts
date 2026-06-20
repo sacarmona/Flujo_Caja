@@ -96,6 +96,8 @@ export type CashFlowResult = {
   openingBalance: Prisma.Decimal;
   days: CashFlowDay[];
   weeks: CashFlowWeek[];
+  /** Saldos confirmados/actualizados por el usuario, indexados por fecha exacta (ver confirmedBalanceByDate). */
+  confirmedBalances: Map<string, Prisma.Decimal>;
 };
 
 const zeroTotals = (): CashFlowGroupTotals => ({
@@ -254,8 +256,23 @@ export function calculateCashFlowByBusinessDay(
     }
   }
 
+  /**
+   * Saldos confirmados/actualizados por el usuario (ej. "Confirmar calculado"
+   * o "Actualizar" en una semana del Calendario), indexados por fecha exacta.
+   * Si una semana no tiene confirmacion, se sigue usando por defecto el saldo
+   * calculado (acumulado de la semana anterior); si la tiene, esa pasa a ser
+   * el saldo inicial de esa semana en adelante.
+   */
+  const confirmedBalanceByDate = new Map(
+    openingBalances.filter((balance) => !balance.deletedAt).map((balance) => [dateKey(balance.balanceDate), decimal(balance.amount)] as const)
+  );
+
   let accumulated = openingBalance;
   for (const day of days) {
+    const confirmed = confirmedBalanceByDate.get(dateKey(day.date));
+    if (confirmed) {
+      accumulated = confirmed;
+    }
     day.netFlow = day.projectedIncome.plus(day.realIncome).minus(day.projectedExpense).minus(day.realExpense);
     accumulated = accumulated.plus(day.netFlow);
     day.accumulatedBalance = accumulated;
@@ -281,5 +298,5 @@ export function calculateCashFlowByBusinessDay(
     weekMap.set(key, week);
   }
 
-  return { openingBalance, days, weeks: [...weekMap.values()] };
+  return { openingBalance, days, weeks: [...weekMap.values()], confirmedBalances: confirmedBalanceByDate };
 }

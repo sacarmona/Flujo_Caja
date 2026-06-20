@@ -53,7 +53,8 @@ describe("opening balance helpers", () => {
     const result: CashFlowResult = {
       openingBalance: new Prisma.Decimal(0),
       days,
-      weeks: []
+      weeks: [],
+      confirmedBalances: new Map()
     };
 
     expect(weekOpeningBalance(result, [days[1], days[2]]).toFixed(0)).toBe("-399000");

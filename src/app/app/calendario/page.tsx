@@ -142,7 +142,7 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
   }));
   const rows = buildCalendarRows(accounts, collapsed);
   const weeks = groupDaysByWeek(result.days);
-  const balances = calendarAccumulatedBalances(result.days, mode, result.openingBalance);
+  const balances = calendarAccumulatedBalances(result.days, mode, result.openingBalance, result.confirmedBalances);
   const suggestedOpening = suggestedOpeningBalanceWeek(result, weeks);
   const canEditOpeningBalance = canManageOpeningBalances(user.role);
 

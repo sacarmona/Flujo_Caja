@@ -201,6 +201,22 @@ describe("cash flow business-day service", () => {
     expect(result.days[1].realExpense.toString()).toBe("50000");
   });
 
+  it("usa por defecto el saldo calculado entre semanas, pero respeta un saldo confirmado/actualizado a mitad de rango", () => {
+    const result = calculateCashFlowByBusinessDay(
+      [],
+      [
+        { amount: "1000000", balanceDate: date("2026-06-01"), deletedAt: null },
+        { amount: "500000", balanceDate: date("2026-06-17"), deletedAt: null }
+      ],
+      { startDate: date("2026-06-15"), endDate: date("2026-06-19") }
+    );
+
+    expect(result.days.find((day) => day.date.getDate() === 15)?.accumulatedBalance.toString()).toBe("1000000");
+    expect(result.days.find((day) => day.date.getDate() === 16)?.accumulatedBalance.toString()).toBe("1000000");
+    expect(result.days.find((day) => day.date.getDate() === 17)?.accumulatedBalance.toString()).toBe("500000");
+    expect(result.days.find((day) => day.date.getDate() === 19)?.accumulatedBalance.toString()).toBe("500000");
+  });
+
   it("excluye Vencido del total real", () => {
     const result = calculateCashFlowByBusinessDay(
       [

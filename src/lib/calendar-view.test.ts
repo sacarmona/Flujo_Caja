@@ -109,6 +109,17 @@ describe("calendar view helpers", () => {
     expect(calendarCellAmount(balanceRow, days[1], "comparison").toString()).toBe("1000");
   });
 
+  it("usa el saldo confirmado/actualizado para la semana en vez del calculado, una vez presente", () => {
+    const balanceRow = buildCalendarRows(accounts).find((item) => item.key === "summary:balance");
+    if (!balanceRow) throw new Error("Missing row");
+
+    const days = [day(), day({ date: new Date(2026, 5, 16) })];
+    const confirmedBalances = new Map([["2026-06-16", new Prisma.Decimal(5000)]]);
+    const balances = calendarAccumulatedBalances(days, "projected", new Prisma.Decimal(1000), confirmedBalances);
+
+    expect(calendarCellAmount(balanceRow, days[1], "projected", balances).toString()).toBe("5090");
+  });
+
   it("builds links to movement filters by date and account", () => {
     expect(movementCellHref({ date: new Date(2026, 5, 15), accountId: "income" })).toBe(
       "/app/movimientos?from=2026-06-15&to=2026-06-15&accountingAccountId=income"

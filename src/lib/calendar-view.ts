@@ -122,15 +122,24 @@ function calendarNetFlow(day: CashFlowDay, mode: CalendarMode): Prisma.Decimal {
  * Saldo acumulado por dia segun el modo seleccionado: se recalcula sumando
  * el flujo neto del modo a partir del saldo inicial, en vez de usar siempre
  * el saldo combinado (mutuamente excluyente) que calcula calculateCashFlowByBusinessDay.
+ *
+ * Si una semana tiene un saldo confirmado/actualizado por el usuario
+ * (confirmedBalances), se usa ese como saldo inicial de esa semana en
+ * adelante; si no, se sigue acumulando por defecto el saldo calculado.
  */
 export function calendarAccumulatedBalances(
   days: CashFlowDay[],
   mode: CalendarMode,
-  openingBalance: Prisma.Decimal
+  openingBalance: Prisma.Decimal,
+  confirmedBalances: Map<string, Prisma.Decimal> = new Map()
 ): Map<string, Prisma.Decimal> {
   const balances = new Map<string, Prisma.Decimal>();
   let accumulated = openingBalance;
   for (const day of days) {
+    const confirmed = confirmedBalances.get(dateKey(day.date));
+    if (confirmed) {
+      accumulated = confirmed;
+    }
     accumulated = accumulated.plus(calendarNetFlow(day, mode));
     balances.set(dateKey(day.date), accumulated);
   }
