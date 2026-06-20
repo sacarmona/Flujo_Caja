@@ -316,6 +316,8 @@ export async function cancelAndDeleteMovementAction(input: { id: string; reason?
       status: "CANCELLED",
       cancelledAt: new Date(),
       deletedAt: new Date(),
+      // Libera la fecha de ocurrencia para que la regla pueda reusarla mas adelante (ver indice unico en updateRecurrenceAction).
+      recurrenceOccurrenceDate: null,
       notes: input.reason?.trim() || current.notes || "Cancelado y borrado del listado por ingreso erroneo."
     }
   });

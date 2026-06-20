@@ -154,6 +154,18 @@ export async function updateRecurrenceAction(formData: FormData) {
       data
     });
 
+    /**
+     * El indice unico (recurrenceRuleId, recurrenceOccurrenceDate) no excluye
+     * filas con deletedAt seteado. Movimientos borrados antes de liberar esa
+     * fecha (desactivar/cancelar la regla) quedan "reservando" la fecha para
+     * siempre y rompen la regeneracion de ocurrencias con P2002. Se libera
+     * aqui antes de generar las nuevas ocurrencias.
+     */
+    await tx.movement.updateMany({
+      where: { recurrenceRuleId: id, deletedAt: { not: null }, recurrenceOccurrenceDate: { not: null } },
+      data: { recurrenceOccurrenceDate: null }
+    });
+
     const movements = await tx.movement.findMany({
       where: {
         companyId: user.companyId,
@@ -336,7 +348,9 @@ export async function setRecurrenceActiveAction(formData: FormData) {
             id: { in: softDeletedMovementIds }
           },
           data: {
-            deletedAt: new Date()
+            deletedAt: new Date(),
+            // Libera la fecha para que una futura reactivacion/edicion pueda reusarla (ver indice unico en updateRecurrenceAction).
+            recurrenceOccurrenceDate: null
           }
         });
         softDeletedMovements = result.count;
