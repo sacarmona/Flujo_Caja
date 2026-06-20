@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatCurrency, formatDate, todayInAppTimeZone } from "./format";
+import { formatCurrency, formatDate, formatDateTime, todayInAppTimeZone } from "./format";
 
 describe("format helpers", () => {
   it("formats CLP amounts using es-CL", () => {
     expect(formatCurrency(1234567)).toBe("$1.234.567");
+  });
+
+  it("formats real timestamps in the Chile time zone", () => {
+    // 02:30 UTC del 20-06 es 19-06 22:30 en Santiago (UTC-4).
+    expect(formatDateTime(new Date("2026-06-20T02:30:00.000Z"))).toContain("19-06-26");
   });
 
   it("formats dates in the configured locale", () => {

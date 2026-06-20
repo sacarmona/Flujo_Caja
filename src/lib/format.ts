@@ -30,6 +30,15 @@ export function formatDate(date: Date): string {
  * dia anterior. Devuelve la fecha local a medianoche (mismo patron que el
  * resto del codigo: new Date(year, month - 1, day)).
  */
+/** Para timestamps reales (createdAt, paidAt de pagos, etc.), no fechas de calendario: aqui si corresponde fijar la zona de la app. */
+export function formatDateTime(date: Date): string {
+  return new Intl.DateTimeFormat(APP_LOCALE, {
+    timeZone: APP_TIME_ZONE,
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(date);
+}
+
 export function todayInAppTimeZone(): Date {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: APP_TIME_ZONE,

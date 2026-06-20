@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, Landmark, ListChecks, Repeat2, Settings, WalletCards } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, History, Landmark, ListChecks, Repeat2, Settings, WalletCards } from "lucide-react";
 import { APP_COMPANY_NAME, ROLE_LABELS, type AppRole } from "@/lib/constants";
 
 const navigation = [
@@ -10,6 +10,7 @@ const navigation = [
   { href: "/app/calendario", label: "Calendario", icon: CalendarDays },
   { href: "/app/movimientos", label: "Movimientos", icon: WalletCards },
   { href: "/app/conciliacion", label: "Conciliacion", icon: ListChecks },
+  { href: "/app/bitacora", label: "Bitacora", icon: History },
   { href: "/app/configuracion", label: "Configuracion", icon: Settings }
 ] as const;
 
