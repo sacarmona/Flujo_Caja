@@ -106,6 +106,60 @@ describe("cash flow business-day service", () => {
 
     expect(result.days[0].projectedExpense.toString()).toBe("30000");
     expect(result.days[0].realExpense.toString()).toBe("0");
+    expect(result.days[0].fullProjectedExpense.toString()).toBe("30000");
+  });
+
+  it("incluye en fullProjected a todos los estados salvo Cancelado, en la fecha proyectada original", () => {
+    const result = calculateCashFlowByBusinessDay(
+      [
+        {
+          ...baseMovement,
+          id: "overdue",
+          type: "EXPENSE" as const,
+          status: "OVERDUE" as const,
+          projectedDate: date("2026-06-17"),
+          projectedAmountClp: "10000",
+          accountingAccountId: expenseAccount.id,
+          businessUnitId: unitAdmin.id,
+          accountingAccount: expenseAccount,
+          businessUnit: unitAdmin
+        },
+        {
+          ...baseMovement,
+          id: "paid-other-date",
+          type: "EXPENSE" as const,
+          status: "PAID_OR_COLLECTED" as const,
+          projectedDate: date("2026-06-17"),
+          projectedAmountClp: "20000",
+          accountingAccountId: expenseAccount.id,
+          businessUnitId: unitAdmin.id,
+          accountingAccount: expenseAccount,
+          businessUnit: unitAdmin,
+          payments: [{ id: "pay-3", amount: "20000", paidAt: date("2026-06-18"), currency: "CLP" as const }]
+        },
+        {
+          ...baseMovement,
+          id: "cancelled",
+          type: "EXPENSE" as const,
+          status: "CANCELLED" as const,
+          cancelledAt: date("2026-06-16"),
+          projectedDate: date("2026-06-17"),
+          projectedAmountClp: "99999",
+          accountingAccountId: expenseAccount.id,
+          businessUnitId: unitAdmin.id,
+          accountingAccount: expenseAccount,
+          businessUnit: unitAdmin
+        }
+      ],
+      openingBalances,
+      { startDate: date("2026-06-17"), endDate: date("2026-06-18") }
+    );
+
+    // El pago se registra en la fecha real (18), pero el fullProjected del
+    // monto pagado se queda en la fecha proyectada original (17), porque
+    // representa el plan original, no lo efectivamente cobrado/pagado.
+    expect(result.days[0].fullProjectedExpense.toString()).toBe("30000");
+    expect(result.days[1].fullProjectedExpense.toString()).toBe("0");
   });
 
   it("counts Pendiente movements without payment as real, using el monto y fecha proyectados", () => {
@@ -143,6 +197,7 @@ describe("cash flow business-day service", () => {
 
     expect(result.days[0].projectedExpense.toString()).toBe("0");
     expect(result.days[0].realExpense.toString()).toBe("30000");
+    expect(result.days[0].fullProjectedExpense.toString()).toBe("80000");
     expect(result.days[1].realExpense.toString()).toBe("50000");
   });
 

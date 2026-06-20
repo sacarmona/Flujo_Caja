@@ -4,6 +4,7 @@ import type { Currency, MovementStatus, MovementType } from "@prisma/client";
 import { calculateSantanderCashFlow } from "@/lib/cash-flow-service";
 import {
   buildCalendarRows,
+  calendarAccumulatedBalances,
   calendarCellAmount,
   calendarMode,
   calendarMonths,
@@ -141,6 +142,7 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
   }));
   const rows = buildCalendarRows(accounts, collapsed);
   const weeks = groupDaysByWeek(result.days);
+  const balances = calendarAccumulatedBalances(result.days, mode, result.openingBalance);
   const suggestedOpening = suggestedOpeningBalanceWeek(result, weeks);
   const canEditOpeningBalance = canManageOpeningBalances(user.role);
 
@@ -335,7 +337,7 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
                   </div>
                 </th>
                 {result.days.map((day) => {
-                  const amount = calendarCellAmount(row, day, mode);
+                  const amount = calendarCellAmount(row, day, mode, balances);
                   const href = movementCellHref({
                     date: day.date,
                     accountId: row.accountId,

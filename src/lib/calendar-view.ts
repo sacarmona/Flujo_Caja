@@ -101,17 +101,48 @@ export function buildCalendarRows(accounts: CalendarAccount[], collapsedCategori
 
 function modeAmount(totals: CashFlowGroupTotals, mode: CalendarMode, type: "income" | "expense") {
   if (type === "income") {
-    if (mode === "projected") return totals.projectedIncome;
+    if (mode === "projected") return totals.fullProjectedIncome;
     if (mode === "real") return totals.realIncome;
     return totals.projectedIncome.plus(totals.realIncome);
   }
 
-  if (mode === "projected") return totals.projectedExpense;
+  if (mode === "projected") return totals.fullProjectedExpense;
   if (mode === "real") return totals.realExpense;
   return totals.projectedExpense.plus(totals.realExpense);
 }
 
-export function calendarCellAmount(row: CalendarRow, day: CashFlowDay, mode: CalendarMode): Prisma.Decimal {
+/** Flujo neto del dia segun el modo seleccionado (Proyectado: pronostico completo; Real: solo lo cobrado/pagado/pendiente; Comparacion: combinado mutuamente excluyente). */
+function calendarNetFlow(day: CashFlowDay, mode: CalendarMode): Prisma.Decimal {
+  if (mode === "projected") return day.fullProjectedIncome.minus(day.fullProjectedExpense);
+  if (mode === "real") return day.realIncome.minus(day.realExpense);
+  return day.netFlow;
+}
+
+/**
+ * Saldo acumulado por dia segun el modo seleccionado: se recalcula sumando
+ * el flujo neto del modo a partir del saldo inicial, en vez de usar siempre
+ * el saldo combinado (mutuamente excluyente) que calcula calculateCashFlowByBusinessDay.
+ */
+export function calendarAccumulatedBalances(
+  days: CashFlowDay[],
+  mode: CalendarMode,
+  openingBalance: Prisma.Decimal
+): Map<string, Prisma.Decimal> {
+  const balances = new Map<string, Prisma.Decimal>();
+  let accumulated = openingBalance;
+  for (const day of days) {
+    accumulated = accumulated.plus(calendarNetFlow(day, mode));
+    balances.set(dateKey(day.date), accumulated);
+  }
+  return balances;
+}
+
+export function calendarCellAmount(
+  row: CalendarRow,
+  day: CashFlowDay,
+  mode: CalendarMode,
+  balances?: Map<string, Prisma.Decimal>
+): Prisma.Decimal {
   if (row.kind === "category" && row.categoryName) {
     const totals = day.byCategory[row.categoryName];
     return totals ? modeAmount(totals, mode, "income").minus(modeAmount(totals, mode, "expense")) : new Prisma.Decimal(0);
@@ -132,13 +163,11 @@ export function calendarCellAmount(row: CalendarRow, day: CashFlowDay, mode: Cal
   }
 
   if (row.summary === "net") {
-    if (mode === "projected") return day.projectedIncome.minus(day.projectedExpense);
-    if (mode === "real") return day.realIncome.minus(day.realExpense);
-    return day.netFlow;
+    return calendarNetFlow(day, mode);
   }
 
   if (row.summary === "balance") {
-    return day.accumulatedBalance;
+    return balances?.get(dateKey(day.date)) ?? day.accumulatedBalance;
   }
 
   return new Prisma.Decimal(0);

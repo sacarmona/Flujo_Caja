@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   buildCalendarRows,
+  calendarAccumulatedBalances,
   calendarCellAmount,
   calendarMode,
   calendarMonths,
@@ -27,6 +28,8 @@ function day(overrides: Partial<CashFlowDay> = {}): CashFlowDay {
     projectedExpense: new Prisma.Decimal(40),
     realIncome: new Prisma.Decimal(80),
     realExpense: new Prisma.Decimal(20),
+    fullProjectedIncome: new Prisma.Decimal(150),
+    fullProjectedExpense: new Prisma.Decimal(60),
     netFlow: new Prisma.Decimal(120),
     accumulatedBalance: new Prisma.Decimal(1000),
     byCategory: {
@@ -34,7 +37,9 @@ function day(overrides: Partial<CashFlowDay> = {}): CashFlowDay {
         projectedIncome: new Prisma.Decimal(100),
         projectedExpense: zero(),
         realIncome: new Prisma.Decimal(80),
-        realExpense: zero()
+        realExpense: zero(),
+        fullProjectedIncome: new Prisma.Decimal(130),
+        fullProjectedExpense: zero()
       }
     },
     byAccountingAccount: {
@@ -42,7 +47,9 @@ function day(overrides: Partial<CashFlowDay> = {}): CashFlowDay {
         projectedIncome: new Prisma.Decimal(100),
         projectedExpense: zero(),
         realIncome: new Prisma.Decimal(80),
-        realExpense: zero()
+        realExpense: zero(),
+        fullProjectedIncome: new Prisma.Decimal(130),
+        fullProjectedExpense: zero()
       }
     },
     byBusinessUnit: {},
@@ -75,9 +82,31 @@ describe("calendar view helpers", () => {
     const row = buildCalendarRows(accounts).find((item) => item.key === "category:Ingresos");
     if (!row) throw new Error("Missing row");
 
-    expect(calendarCellAmount(row, day(), "projected").toString()).toBe("100");
+    expect(calendarCellAmount(row, day(), "projected").toString()).toBe("130");
     expect(calendarCellAmount(row, day(), "real").toString()).toBe("80");
     expect(calendarCellAmount(row, day(), "comparison").toString()).toBe("180");
+  });
+
+  it("calculates net flow per mode using fullProjected/real totals", () => {
+    const netRow = buildCalendarRows(accounts).find((item) => item.key === "summary:net");
+    if (!netRow) throw new Error("Missing row");
+
+    expect(calendarCellAmount(netRow, day(), "projected").toString()).toBe("90");
+    expect(calendarCellAmount(netRow, day(), "real").toString()).toBe("60");
+    expect(calendarCellAmount(netRow, day(), "comparison").toString()).toBe("120");
+  });
+
+  it("recalculates accumulated balance per mode instead of using the combined total", () => {
+    const balanceRow = buildCalendarRows(accounts).find((item) => item.key === "summary:balance");
+    if (!balanceRow) throw new Error("Missing row");
+
+    const days = [day(), day({ date: new Date(2026, 5, 16) })];
+    const projectedBalances = calendarAccumulatedBalances(days, "projected", new Prisma.Decimal(1000));
+    const realBalances = calendarAccumulatedBalances(days, "real", new Prisma.Decimal(1000));
+
+    expect(calendarCellAmount(balanceRow, days[1], "projected", projectedBalances).toString()).toBe("1180");
+    expect(calendarCellAmount(balanceRow, days[1], "real", realBalances).toString()).toBe("1120");
+    expect(calendarCellAmount(balanceRow, days[1], "comparison").toString()).toBe("1000");
   });
 
   it("builds links to movement filters by date and account", () => {

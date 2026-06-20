@@ -19,6 +19,8 @@ function day(date: Date, netFlow: number, accumulatedBalance: number): CashFlowD
     projectedExpense: netFlow < 0 ? new Prisma.Decimal(Math.abs(netFlow)) : zero(),
     realIncome: zero(),
     realExpense: zero(),
+    fullProjectedIncome: netFlow > 0 ? new Prisma.Decimal(netFlow) : zero(),
+    fullProjectedExpense: netFlow < 0 ? new Prisma.Decimal(Math.abs(netFlow)) : zero(),
     netFlow: new Prisma.Decimal(netFlow),
     accumulatedBalance: new Prisma.Decimal(accumulatedBalance),
     byCategory: {},

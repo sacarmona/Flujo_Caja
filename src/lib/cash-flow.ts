@@ -66,6 +66,15 @@ export type CashFlowGroupTotals = {
   projectedExpense: Prisma.Decimal;
   realIncome: Prisma.Decimal;
   realExpense: Prisma.Decimal;
+  /**
+   * Pronostico completo: todos los movimientos no cancelados (cualquier
+   * estado), siempre con su fecha y monto proyectados. Independiente de
+   * projectedIncome/projectedExpense, que son mutuamente excluyentes con
+   * realIncome/realExpense para evitar doble conteo en el saldo combinado
+   * (usado por el dashboard y la sugerencia de saldo inicial).
+   */
+  fullProjectedIncome: Prisma.Decimal;
+  fullProjectedExpense: Prisma.Decimal;
 };
 
 export type CashFlowDay = CashFlowGroupTotals & {
@@ -93,7 +102,9 @@ const zeroTotals = (): CashFlowGroupTotals => ({
   projectedIncome: new Prisma.Decimal(0),
   projectedExpense: new Prisma.Decimal(0),
   realIncome: new Prisma.Decimal(0),
-  realExpense: new Prisma.Decimal(0)
+  realExpense: new Prisma.Decimal(0),
+  fullProjectedIncome: new Prisma.Decimal(0),
+  fullProjectedExpense: new Prisma.Decimal(0)
 });
 
 function addToTotals(target: CashFlowGroupTotals, bucket: keyof CashFlowGroupTotals, amount: Prisma.Decimal) {
@@ -174,12 +185,19 @@ function bucketFor(type: MovementType, isReal: boolean): keyof CashFlowGroupTota
   return isReal ? "realExpense" : "projectedExpense";
 }
 
-function addEntry(day: CashFlowDay, movement: CashFlowMovement, amount: Prisma.Decimal, isReal: boolean) {
-  const bucket = bucketFor(movement.type, isReal);
+function addToAllLevels(day: CashFlowDay, movement: CashFlowMovement, bucket: keyof CashFlowGroupTotals, amount: Prisma.Decimal) {
   addToTotals(day, bucket, amount);
   addToTotals(getTotals(day.byCategory, movementCategory(movement)), bucket, amount);
   addToTotals(getTotals(day.byAccountingAccount, movement.accountingAccount.name), bucket, amount);
   addToTotals(getTotals(day.byBusinessUnit, movement.businessUnit.name), bucket, amount);
+}
+
+function addEntry(day: CashFlowDay, movement: CashFlowMovement, amount: Prisma.Decimal, isReal: boolean) {
+  addToAllLevels(day, movement, bucketFor(movement.type, isReal), amount);
+}
+
+function addFullProjectedEntry(day: CashFlowDay, movement: CashFlowMovement, amount: Prisma.Decimal) {
+  addToAllLevels(day, movement, movement.type === "INCOME" ? "fullProjectedIncome" : "fullProjectedExpense", amount);
 }
 
 export function calculateOpeningBalance(openingBalances: CashFlowOpeningBalance[], startDate: Date): Prisma.Decimal {
@@ -214,6 +232,12 @@ export function calculateCashFlowByBusinessDay(
       continue;
     }
 
+    const projectedDate = moveToNextBusinessDay(movement.projectedDate, holidaySet);
+    const projectedDay = dayByKey.get(dateKey(projectedDate));
+    if (projectedDay) {
+      addFullProjectedEntry(projectedDay, movement, decimal(movement.projectedAmountClp));
+    }
+
     const active = movement.payments.filter((payment) => !payment.deletedAt && !payment.cancelledAt);
     const isReal = realEligibleStatuses.includes(movement.status);
 
@@ -225,12 +249,8 @@ export function calculateCashFlowByBusinessDay(
           addEntry(day, movement, decimal(payment.amount), true);
         }
       }
-    } else {
-      const projectedDate = moveToNextBusinessDay(movement.projectedDate, holidaySet);
-      const day = dayByKey.get(dateKey(projectedDate));
-      if (day) {
-        addEntry(day, movement, decimal(movement.projectedAmountClp), isReal);
-      }
+    } else if (projectedDay) {
+      addEntry(projectedDay, movement, decimal(movement.projectedAmountClp), isReal);
     }
   }
 
@@ -255,6 +275,8 @@ export function calculateCashFlowByBusinessDay(
     week.projectedExpense = week.projectedExpense.plus(day.projectedExpense);
     week.realIncome = week.realIncome.plus(day.realIncome);
     week.realExpense = week.realExpense.plus(day.realExpense);
+    week.fullProjectedIncome = week.fullProjectedIncome.plus(day.fullProjectedIncome);
+    week.fullProjectedExpense = week.fullProjectedExpense.plus(day.fullProjectedExpense);
     week.netFlow = week.netFlow.plus(day.netFlow);
     weekMap.set(key, week);
   }
