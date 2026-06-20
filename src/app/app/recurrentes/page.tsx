@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { RecurrenceFrequency } from "@prisma/client";
+import type { MovementType, RecurrenceFrequency } from "@prisma/client";
 import {
   createRecurrenceAction,
   generateRecurringMovementsAction,
@@ -8,11 +8,13 @@ import {
   updateRecurrenceAction
 } from "@/app/app/recurrentes/actions";
 import { RecurrenceForm } from "@/app/app/recurrentes/recurrence-form";
+import { typeLabels } from "@/app/app/movimientos/shared";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { canManageRecurrences, generatedMovementLink, previewRecurrence, recurrenceFrequencies } from "@/lib/recurrence-rules";
 import { dateKey } from "@/lib/recurrences";
 import { getHolidayKeys } from "@/lib/holidays-cl";
+import { movementTypes } from "@/lib/movements";
 import { prisma } from "@/lib/prisma";
 
 const pageSize = 10;
@@ -35,6 +37,7 @@ type SearchParams = {
   frequency?: RecurrenceFrequency;
   accountingAccountId?: string;
   businessUnitId?: string;
+  type?: MovementType;
 };
 
 type RecurrentesPageProps = {
@@ -76,7 +79,8 @@ async function getRecurrences(companyId: string, filters: SearchParams) {
     ...(filters.state === "inactive" ? { isActive: false } : {}),
     ...(filters.frequency ? { frequency: filters.frequency } : {}),
     ...(filters.accountingAccountId ? { accountingAccountId: filters.accountingAccountId } : {}),
-    ...(filters.businessUnitId ? { businessUnitId: filters.businessUnitId } : {})
+    ...(filters.businessUnitId ? { businessUnitId: filters.businessUnitId } : {}),
+    ...(filters.type ? { type: filters.type } : {})
   };
   const [items, total] = await Promise.all([
     prisma.recurrenceRule.findMany({
@@ -133,7 +137,7 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
         </p>
       </div>
 
-      <form className="mt-6 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-5">
+      <form className="mt-6 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-6">
         <label className="text-sm">
           <span className="mb-1 block text-slate-600">Estado</span>
           <select className="w-full rounded-md border border-slate-300 px-2 py-2" name="state" defaultValue={filters.state ?? ""}>
@@ -169,6 +173,13 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
                 {unit.name}
               </option>
             ))}
+          </select>
+        </label>
+        <label className="text-sm">
+          <span className="mb-1 block text-slate-600">Tipo</span>
+          <select className="w-full rounded-md border border-slate-300 px-2 py-2" name="type" defaultValue={filters.type ?? ""}>
+            <option value="">Todos</option>
+            <SelectOptions labels={typeLabels} values={movementTypes} />
           </select>
         </label>
         <button className="self-end rounded-md bg-adentu-blue px-3 py-2 text-sm font-semibold text-white transition hover:bg-adentu-teal" type="submit">
