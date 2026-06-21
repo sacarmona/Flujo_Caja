@@ -66,12 +66,48 @@ function weekOfYear(date: Date): { year: number; week: number } {
   return { year: isoYear, week };
 }
 
+/** Clave "año-semana" ISO 8601 de una fecha; usada para agrupar y para indexar el saldo acumulado por semana. */
+export function weekKeyOf(date: Date): string {
+  const { year, week } = weekOfYear(date);
+  return `${year}-${week}`;
+}
+
+export type BalanceMovement = {
+  type: MovementType;
+  status: MovementStatus;
+  projectedDate: Date;
+  projectedAmountClp: Prisma.Decimal | number | string;
+};
+
+/**
+ * Saldo acumulado en CLP al cierre de cada semana, considerando TODOS los
+ * movimientos que cumplen el filtro actual (no solo los de la pagina
+ * visible), para que el acumulado sea correcto al cambiar de pagina. Ingresa
+ * en positivo, egresa en negativo; los movimientos cancelados no suman.
+ */
+export function balanceByWeekKey(movements: BalanceMovement[]): Map<string, Prisma.Decimal> {
+  const sorted = [...movements]
+    .filter((movement) => movement.status !== "CANCELLED")
+    .sort((a, b) => a.projectedDate.getTime() - b.projectedDate.getTime());
+
+  const balances = new Map<string, Prisma.Decimal>();
+  let cumulative = new Prisma.Decimal(0);
+
+  for (const movement of sorted) {
+    const signed = new Prisma.Decimal(movement.projectedAmountClp).mul(movement.type === "INCOME" ? 1 : -1);
+    cumulative = cumulative.plus(signed);
+    balances.set(weekKeyOf(movement.projectedDate), cumulative);
+  }
+
+  return balances;
+}
+
 /**
  * Agrupa una lista ya ordenada por fecha en bloques de semana ISO 8601
  * (lunes a domingo), etiquetando cada bloque con su numero real de semana
  * en vez de un contador secuencial de apariciones.
  */
-export function groupByWeek<T>(items: T[], dateOf: (item: T) => Date): { label: string; items: T[] }[] {
+export function groupByWeek<T>(items: T[], dateOf: (item: T) => Date): { key: string; label: string; items: T[] }[] {
   const groups: { key: string; label: string; items: T[] }[] = [];
 
   for (const item of items) {

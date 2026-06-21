@@ -4,7 +4,8 @@ import type { MovementStatus, MovementType } from "@prisma/client";
 import { createMovementAction, getMovementDefaults } from "@/app/app/movimientos/actions";
 import { MovementForm } from "@/app/app/movimientos/movement-form";
 import { QuickEditRow } from "@/app/app/movimientos/quick-edit-row";
-import { groupByWeek, movementInclude, statusLabels, typeLabels } from "@/app/app/movimientos/shared";
+import { balanceByWeekKey, groupByWeek, movementInclude, statusLabels, typeLabels } from "@/app/app/movimientos/shared";
+import { formatCurrency } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { canModifyMovements, movementStatuses, movementTypes } from "@/lib/movements";
 import { prisma } from "@/lib/prisma";
@@ -71,9 +72,8 @@ async function getReferenceData(companyId: string) {
   return { accounts, businessUnits, bankAccounts, projects, costCenters };
 }
 
-async function getMovements(companyId: string, filters: SearchParams) {
-  const page = Math.max(Number(filters.page ?? 1) || 1, 1);
-  const where = {
+function movementsWhere(companyId: string, filters: SearchParams) {
+  return {
     companyId,
     deletedAt: null,
     ...(filters.type ? { type: filters.type } : {}),
@@ -90,6 +90,11 @@ async function getMovements(companyId: string, filters: SearchParams) {
         }
       : {})
   };
+}
+
+async function getMovements(companyId: string, filters: SearchParams) {
+  const page = Math.max(Number(filters.page ?? 1) || 1, 1);
+  const where = movementsWhere(companyId, filters);
 
   const [items, total] = await Promise.all([
     prisma.movement.findMany({
@@ -103,6 +108,19 @@ async function getMovements(companyId: string, filters: SearchParams) {
   ]);
 
   return { items, total, page, pages: Math.max(Math.ceil(total / pageSize), 1) };
+}
+
+/**
+ * Saldo acumulado por semana considerando TODOS los movimientos que cumplen
+ * el filtro actual (no solo los de la pagina visible), para que sea correcto
+ * al cambiar de pagina. Solo trae los campos minimos necesarios.
+ */
+async function getWeeklyBalances(companyId: string, filters: SearchParams) {
+  const movements = await prisma.movement.findMany({
+    where: movementsWhere(companyId, filters),
+    select: { type: true, status: true, projectedDate: true, projectedAmountClp: true }
+  });
+  return balanceByWeekKey(movements);
 }
 
 function pageHref(page: number, filters: SearchParams) {
@@ -123,10 +141,11 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
     return null;
   }
 
-  const [referenceData, defaults, result] = await Promise.all([
+  const [referenceData, defaults, result, weeklyBalances] = await Promise.all([
     getReferenceData(user.companyId),
     getMovementDefaults(user.companyId),
-    getMovements(user.companyId, filters)
+    getMovements(user.companyId, filters),
+    getWeeklyBalances(user.companyId, filters)
   ]);
   const canWrite = canModifyMovements(user.role);
   const weeks = groupByWeek(result.items, (movement) => movement.projectedDate);
@@ -248,18 +267,24 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
                 </tr>
               </thead>
               <tbody>
-                {weeks.map((week) => (
-                  <Fragment key={week.label}>
-                    <tr className="bg-adentu-blue/5">
-                      <td className="px-3 py-1.5 text-xs font-semibold text-adentu-blue" colSpan={7}>
-                        {week.label}
-                      </td>
-                    </tr>
-                    {week.items.map((movement) => (
-                      <QuickEditRow canWrite={canWrite} key={movement.id} movement={movement} />
-                    ))}
-                  </Fragment>
-                ))}
+                {weeks.map((week) => {
+                  const balance = weeklyBalances.get(week.key);
+                  return (
+                    <Fragment key={week.key}>
+                      <tr className="bg-adentu-blue/5">
+                        <td className="px-3 py-1.5 text-xs font-semibold text-adentu-blue" colSpan={6}>
+                          {week.label}
+                        </td>
+                        <td className="px-3 py-1.5 text-right text-xs font-semibold text-adentu-blue">
+                          {balance ? `Saldo: ${formatCurrency(balance.toNumber())}` : ""}
+                        </td>
+                      </tr>
+                      {week.items.map((movement) => (
+                        <QuickEditRow canWrite={canWrite} key={movement.id} movement={movement} />
+                      ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
