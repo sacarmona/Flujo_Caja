@@ -1,11 +1,10 @@
 import Link from "next/link";
-import { Fragment } from "react";
 import { Prisma } from "@prisma/client";
 import type { MovementStatus, MovementType } from "@prisma/client";
 import { createMovementAction, getMovementDefaults } from "@/app/app/movimientos/actions";
 import { MovementForm } from "@/app/app/movimientos/movement-form";
-import { QuickEditRow } from "@/app/app/movimientos/quick-edit-row";
 import { groupByWeek, movementInclude, statusLabels, typeLabels } from "@/app/app/movimientos/shared";
+import { WeeklyMovementsTable } from "@/app/app/movimientos/weekly-movements-table";
 import { calculateSantanderCashFlow } from "@/lib/cash-flow-service";
 import { weeklyAccumulatedBalances } from "@/lib/calendar-view";
 import { formatCurrency, todayInAppTimeZone } from "@/lib/format";
@@ -185,7 +184,10 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
     getWeeklyBalances(user.companyId, filters)
   ]);
   const canWrite = canModifyMovements(user.role);
-  const weeks = groupByWeek(result.items, (movement) => movement.projectedDate);
+  const weeks = groupByWeek(result.items, (movement) => movement.projectedDate).map((week) => {
+    const balance = weeklyBalances.get(week.key);
+    return { ...week, balanceText: balance ? `Saldo: ${formatCurrency(balance.toNumber())}` : "" };
+  });
 
   return (
     <section className="max-w-7xl">
@@ -290,41 +292,7 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
             No hay movimientos para los filtros seleccionados.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-            <table className="w-full text-left">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Fecha</th>
-                  <th className="px-3 py-2 font-medium">Descripcion</th>
-                  <th className="px-3 py-2 font-medium">Tipo</th>
-                  <th className="px-3 py-2 font-medium">Cuenta contable</th>
-                  <th className="px-3 py-2 text-right font-medium">Monto</th>
-                  <th className="px-3 py-2 font-medium">Estado</th>
-                  <th className="px-3 py-2 text-right font-medium">Ver</th>
-                </tr>
-              </thead>
-              <tbody>
-                {weeks.map((week) => {
-                  const balance = weeklyBalances.get(week.key);
-                  return (
-                    <Fragment key={week.key}>
-                      <tr className="bg-adentu-blue/5">
-                        <td className="px-3 py-1.5 text-xs font-semibold text-adentu-blue" colSpan={6}>
-                          {week.label}
-                        </td>
-                        <td className="px-3 py-1.5 text-right text-xs font-semibold text-adentu-blue">
-                          {balance ? `Saldo: ${formatCurrency(balance.toNumber())}` : ""}
-                        </td>
-                      </tr>
-                      {week.items.map((movement) => (
-                        <QuickEditRow canWrite={canWrite} key={movement.id} movement={movement} />
-                      ))}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <WeeklyMovementsTable canWrite={canWrite} weeks={weeks} />
         )}
 
         <div className="flex justify-end gap-2">
