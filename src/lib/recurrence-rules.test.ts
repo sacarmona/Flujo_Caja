@@ -21,6 +21,8 @@ const input = {
   description: "Arriendo mensual",
   amount: "250000",
   currency: "CLP" as const,
+  manualRate: null,
+  manualRateReason: null,
   bankAccountId: "bank",
   businessUnitId: "unit",
   projectId: null,

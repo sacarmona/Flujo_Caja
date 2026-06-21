@@ -70,6 +70,8 @@ type RecurrenceLike = {
   frequency: RecurrenceFrequency;
   id: string;
   intervalDays: number | null;
+  manualRate: Parameters<typeof recurrenceAmountToString>[0] | null;
+  manualRateReason: string | null;
   notes: string | null;
   projectId: string | null;
   startDate: Date;
@@ -92,6 +94,7 @@ export function RecurrenceForm({
 }) {
   const [type, setType] = useState<MovementType>(recurrence?.type ?? "EXPENSE");
   const [frequency, setFrequency] = useState<RecurrenceFrequency>(recurrence?.frequency ?? "MONTHLY");
+  const [currency, setCurrency] = useState<string>(recurrence?.currency ?? "CLP");
   const matchingAccounts = referenceData.accounts.filter((account) => accountMatchesMovementType(account.type, type));
   const currentAccountStillMatches = recurrence?.accountingAccountId
     ? matchingAccounts.some((account) => account.id === recurrence.accountingAccountId)
@@ -145,10 +148,15 @@ export function RecurrenceForm({
       </label>
       <label className="text-sm">
         <span className="mb-1 block text-slate-600">Moneda</span>
-        <select className="w-full rounded-md border border-slate-300 px-2 py-2" name="currency" defaultValue={recurrence?.currency ?? "CLP"}>
-          {movementCurrencies.map((currency) => (
-            <option key={currency} value={currency}>
-              {currency}
+        <select
+          className="w-full rounded-md border border-slate-300 px-2 py-2"
+          name="currency"
+          onChange={(event) => setCurrency(event.target.value)}
+          value={currency}
+        >
+          {movementCurrencies.map((option) => (
+            <option key={option} value={option}>
+              {option}
             </option>
           ))}
         </select>
@@ -252,6 +260,27 @@ export function RecurrenceForm({
           required={needsDayOfWeek}
           type="number"
           defaultValue={recurrence ? recurrence.dayOfWeek ?? recurrence.startDate.getDay() : ""}
+        />
+      </label>
+      <label className="text-sm">
+        <span className="mb-1 block text-slate-600">Tasa manual {currency !== "CLP" ? "(respaldo si falla la tasa automatica)" : ""}</span>
+        <input
+          className="w-full rounded-md border border-slate-300 px-2 py-2 disabled:bg-slate-100"
+          disabled={currency === "CLP"}
+          min="0.000001"
+          name="manualRate"
+          step="0.000001"
+          type="number"
+          defaultValue={recurrence?.manualRate ? recurrenceAmountToString(recurrence.manualRate) : ""}
+        />
+      </label>
+      <label className="text-sm md:col-span-2">
+        <span className="mb-1 block text-slate-600">Motivo tasa manual</span>
+        <input
+          className="w-full rounded-md border border-slate-300 px-2 py-2 disabled:bg-slate-100"
+          disabled={currency === "CLP"}
+          name="manualRateReason"
+          defaultValue={recurrence?.manualRateReason ?? ""}
         />
       </label>
       <label className="text-sm">

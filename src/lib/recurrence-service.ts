@@ -74,6 +74,8 @@ export async function generateMovementsForRecurrence(ruleId: string, options: Re
         currency: rule.currency,
         date: occurrence.projectedDate,
         provider: options.exchangeRateProvider,
+        manualRate: rule.manualRate?.toString() ?? null,
+        manualReason: rule.manualRateReason,
         preferAutomatic: true
       });
 

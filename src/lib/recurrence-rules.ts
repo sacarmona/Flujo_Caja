@@ -27,6 +27,8 @@ export type RecurrenceFormInput = {
   description: string;
   amount: string;
   currency: Currency;
+  manualRate: string | null;
+  manualRateReason: string | null;
   bankAccountId: string;
   businessUnitId: string;
   projectId: string | null;
@@ -66,6 +68,20 @@ function optionalInteger(value: string | null, label: string, min: number, max: 
   }
 
   return parsed;
+}
+
+/** Tasa de respaldo si la consulta automatica (mindicador.cl) falla; ver CachedHttpExchangeRateProvider. */
+function parseOptionalManualRate(value: string | null): Prisma.Decimal | null {
+  if (!value) {
+    return null;
+  }
+
+  const rate = new Prisma.Decimal(value.replace(",", "."));
+  if (!rate.isFinite() || rate.lte(0)) {
+    throw new Error("La tasa manual debe ser positiva.");
+  }
+
+  return rate;
 }
 
 export function canManageRecurrences(role: Role): boolean {
@@ -150,12 +166,16 @@ export function validateRecurrenceInput(input: RecurrenceFormInput, refs: Recurr
     throw new Error("Dia de la semana es obligatoria para esta frecuencia.");
   }
 
+  const manualRate = parseOptionalManualRate(input.manualRate);
+
   return {
     type: input.type,
     accountingAccountId: input.accountingAccountId,
     description: input.description.trim(),
     amount: parsePositiveDecimal(input.amount),
     currency: input.currency,
+    manualRate,
+    manualRateReason: manualRate ? input.manualRateReason?.trim() || null : null,
     bankAccountId: input.bankAccountId,
     businessUnitId: input.businessUnitId,
     projectId: input.projectId,

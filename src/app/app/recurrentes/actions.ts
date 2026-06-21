@@ -1,9 +1,9 @@
 "use server";
 
-import { Prisma } from "@prisma/client";
 import type { Currency, MovementStatus, MovementType, RecurrenceFrequency } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import { resolveConversionAllowManualFallback, type ExchangeRateProvider } from "@/lib/exchange-rates";
+import { resolveConversionAllowManualFallback } from "@/lib/exchange-rates";
+import { CachedHttpExchangeRateProvider } from "@/lib/exchange-rate-providers";
 import { generateRecurrenceOccurrences, dateKey } from "@/lib/recurrences";
 import {
   assertCanManageRecurrences,
@@ -33,6 +33,8 @@ function formInput(formData: FormData): RecurrenceFormInput {
     description: stringValue(formData, "description"),
     amount: stringValue(formData, "amount"),
     currency: stringValue(formData, "currency") as Currency,
+    manualRate: optionalStringValue(formData, "manualRate"),
+    manualRateReason: optionalStringValue(formData, "manualRateReason"),
     bankAccountId: stringValue(formData, "bankAccountId"),
     businessUnitId: stringValue(formData, "businessUnitId"),
     projectId: optionalStringValue(formData, "projectId"),
@@ -91,37 +93,6 @@ async function audit(params: {
       after: params.after === undefined ? undefined : JSON.parse(JSON.stringify(params.after))
     }
   });
-}
-
-class DatabaseExchangeRateProvider implements ExchangeRateProvider {
-  constructor(private readonly companyId: string) {}
-
-  async getRate(currency: Currency, date: Date) {
-    if (currency === "CLP") {
-      return { currency, date, rate: new Prisma.Decimal(1), source: "CLP" };
-    }
-
-    const start = new Date(date);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(date);
-    end.setHours(23, 59, 59, 999);
-    const rate = await prisma.exchangeRate.findFirst({
-      where: {
-        companyId: this.companyId,
-        fromCurrency: currency,
-        toCurrency: "CLP",
-        rateDate: { gte: start, lte: end },
-        deletedAt: null
-      },
-      orderBy: { createdAt: "desc" }
-    });
-
-    if (!rate) {
-      throw new Error(`No hay tasa ${currency}/CLP para la fecha seleccionada.`);
-    }
-
-    return { currency, date, rate: rate.rate, source: rate.source ?? "ExchangeRate" };
-  }
 }
 
 export async function createRecurrenceAction(formData: FormData) {
@@ -339,7 +310,9 @@ export async function updateRecurrenceAction(formData: FormData) {
         amount: saved.amount,
         currency: saved.currency,
         date: occurrence.projectedDate,
-        provider: new DatabaseExchangeRateProvider(user.companyId),
+        provider: new CachedHttpExchangeRateProvider(tx, user.companyId),
+        manualRate: saved.manualRate?.toString() ?? null,
+        manualReason: saved.manualRateReason,
         preferAutomatic: true
       });
 
@@ -493,7 +466,7 @@ export async function generateRecurringMovementsAction(formData: FormData) {
   const holidays = await getHolidayKeys(prisma);
   const result = await generateMovementsForRecurrence(id, {
     prisma,
-    exchangeRateProvider: new DatabaseExchangeRateProvider(user.companyId),
+    exchangeRateProvider: new CachedHttpExchangeRateProvider(prisma, user.companyId),
     holidays,
     months: 12
   });

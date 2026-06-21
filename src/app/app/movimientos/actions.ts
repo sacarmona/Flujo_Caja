@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import type { Currency, MovementStatus, MovementType } from "@prisma/client";
-import type { PrismaClient } from "@prisma/client";
-import { resolveConversionAllowManualFallback, type ExchangeRateProvider } from "@/lib/exchange-rates";
+import { resolveConversionAllowManualFallback } from "@/lib/exchange-rates";
+import { CachedHttpExchangeRateProvider } from "@/lib/exchange-rate-providers";
 import { assertCanModifyMovements, canCancelAndDeleteMovement, movementStatuses, validateMovementInput, type MovementFormInput } from "@/lib/movements";
 import { getCurrentUser } from "@/lib/auth";
 import {
@@ -42,40 +42,6 @@ function formInput(formData: FormData): MovementFormInput {
     status: stringValue(formData, "status") as MovementStatus,
     notes: optionalStringValue(formData, "notes")
   };
-}
-
-class DatabaseExchangeRateProvider implements ExchangeRateProvider {
-  constructor(
-    private readonly db: PrismaClient,
-    private readonly companyId: string
-  ) {}
-
-  async getRate(currency: Currency, date: Date) {
-    if (currency === "CLP") {
-      return { currency, date, rate: new Prisma.Decimal(1), source: "CLP" };
-    }
-
-    const start = new Date(date);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(date);
-    end.setHours(23, 59, 59, 999);
-    const rate = await this.db.exchangeRate.findFirst({
-      where: {
-        companyId: this.companyId,
-        fromCurrency: currency,
-        toCurrency: "CLP",
-        rateDate: { gte: start, lte: end },
-        deletedAt: null
-      },
-      orderBy: { createdAt: "desc" }
-    });
-
-    if (!rate) {
-      throw new Error(`No hay tasa ${currency}/CLP para la fecha seleccionada.`);
-    }
-
-    return { currency, date, rate: rate.rate, source: rate.source ?? "ExchangeRate" };
-  }
 }
 
 async function requireMovementWriter() {
@@ -138,7 +104,7 @@ export async function createMovementAction(formData: FormData) {
     date: data.projectedDate,
     manualRate: input.manualRate,
     manualReason: input.manualRateReason,
-    provider: new DatabaseExchangeRateProvider(prisma, user.companyId)
+    provider: new CachedHttpExchangeRateProvider(prisma, user.companyId)
   });
 
   const movement = await prisma.movement.create({
@@ -184,7 +150,7 @@ export async function updateMovementAction(formData: FormData) {
     date: data.projectedDate,
     manualRate: input.manualRate,
     manualReason: input.manualRateReason,
-    provider: new DatabaseExchangeRateProvider(prisma, user.companyId)
+    provider: new CachedHttpExchangeRateProvider(prisma, user.companyId)
   });
   const updated = await prisma.movement.update({
     where: { id },
