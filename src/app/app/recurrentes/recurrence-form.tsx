@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { AccountingAccountType, MovementStatus, MovementType, RecurrenceFrequency } from "@prisma/client";
 import { AmountInput } from "@/components/amount-input";
 import { accountMatchesMovementType, movementCurrencies, movementStatuses, movementTypes } from "@/lib/movements";
-import { recurrenceAmountToString, recurrenceFrequencies } from "@/lib/recurrence-rules";
+import { monthlyDayFrequencies, recurrenceAmountToString, recurrenceFrequencies, weeklyDayFrequencies } from "@/lib/recurrence-rules";
 
 const typeLabels: Record<MovementType, string> = {
   INCOME: "Ingreso",
@@ -91,10 +91,13 @@ export function RecurrenceForm({
   submitLabel: string;
 }) {
   const [type, setType] = useState<MovementType>(recurrence?.type ?? "EXPENSE");
+  const [frequency, setFrequency] = useState<RecurrenceFrequency>(recurrence?.frequency ?? "MONTHLY");
   const matchingAccounts = referenceData.accounts.filter((account) => accountMatchesMovementType(account.type, type));
   const currentAccountStillMatches = recurrence?.accountingAccountId
     ? matchingAccounts.some((account) => account.id === recurrence.accountingAccountId)
     : false;
+  const needsDayOfMonth = (monthlyDayFrequencies as readonly RecurrenceFrequency[]).includes(frequency);
+  const needsDayOfWeek = (weeklyDayFrequencies as readonly RecurrenceFrequency[]).includes(frequency);
 
   return (
     <form action={action} className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-6">
@@ -204,21 +207,52 @@ export function RecurrenceForm({
       </label>
       <label className="text-sm">
         <span className="mb-1 block text-slate-600">Frecuencia</span>
-        <select className="w-full rounded-md border border-slate-300 px-2 py-2" name="frequency" defaultValue={recurrence?.frequency ?? "MONTHLY"}>
+        <select
+          className="w-full rounded-md border border-slate-300 px-2 py-2"
+          name="frequency"
+          onChange={(event) => setFrequency(event.target.value as RecurrenceFrequency)}
+          value={frequency}
+        >
           <SelectOptions labels={frequencyLabels} values={recurrenceFrequencies} />
         </select>
       </label>
       <label className="text-sm">
-        <span className="mb-1 block text-slate-600">Intervalo</span>
-        <input className="w-full rounded-md border border-slate-300 px-2 py-2" min="1" name="intervalDays" type="number" defaultValue={recurrence?.intervalDays ?? ""} />
+        <span className="mb-1 block text-slate-600">Intervalo {frequency === "EVERY_N_DAYS" ? "(obligatorio)" : ""}</span>
+        <input
+          className="w-full rounded-md border border-slate-300 px-2 py-2 disabled:bg-slate-100"
+          disabled={frequency !== "EVERY_N_DAYS"}
+          min="1"
+          name="intervalDays"
+          required={frequency === "EVERY_N_DAYS"}
+          type="number"
+          defaultValue={recurrence?.intervalDays ?? ""}
+        />
       </label>
       <label className="text-sm">
-        <span className="mb-1 block text-slate-600">Dia del mes</span>
-        <input className="w-full rounded-md border border-slate-300 px-2 py-2" max="31" min="1" name="dayOfMonth" type="number" defaultValue={recurrence?.dayOfMonth ?? ""} />
+        <span className="mb-1 block text-slate-600">Dia del mes {needsDayOfMonth ? "(obligatorio)" : ""}</span>
+        <input
+          className="w-full rounded-md border border-slate-300 px-2 py-2 disabled:bg-slate-100"
+          disabled={!needsDayOfMonth}
+          max="31"
+          min="1"
+          name="dayOfMonth"
+          required={needsDayOfMonth}
+          type="number"
+          defaultValue={recurrence ? recurrence.dayOfMonth ?? recurrence.startDate.getDate() : ""}
+        />
       </label>
       <label className="text-sm">
-        <span className="mb-1 block text-slate-600">Dia semana</span>
-        <input className="w-full rounded-md border border-slate-300 px-2 py-2" max="6" min="0" name="dayOfWeek" type="number" defaultValue={recurrence?.dayOfWeek ?? ""} />
+        <span className="mb-1 block text-slate-600">Dia semana {needsDayOfWeek ? "(obligatorio, 0=domingo)" : ""}</span>
+        <input
+          className="w-full rounded-md border border-slate-300 px-2 py-2 disabled:bg-slate-100"
+          disabled={!needsDayOfWeek}
+          max="6"
+          min="0"
+          name="dayOfWeek"
+          required={needsDayOfWeek}
+          type="number"
+          defaultValue={recurrence ? recurrence.dayOfWeek ?? recurrence.startDate.getDay() : ""}
+        />
       </label>
       <label className="text-sm">
         <span className="mb-1 block text-slate-600">Inicio</span>

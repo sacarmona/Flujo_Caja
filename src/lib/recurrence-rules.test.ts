@@ -53,11 +53,41 @@ describe("recurrence rule helpers", () => {
     expect(() => validateRecurrenceInput({ ...input, frequency: "EVERY_N_DAYS", intervalDays: null }, refs)).toThrow("intervalo");
   });
 
+  it("requiere Dia del mes para frecuencias mensuales/trimestrales/semestrales/anuales", () => {
+    for (const frequency of ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"] as const) {
+      expect(() => validateRecurrenceInput({ ...input, frequency, dayOfMonth: null }, refs)).toThrow("Dia del mes");
+      expect(() => validateRecurrenceInput({ ...input, frequency, dayOfMonth: "15" }, refs)).not.toThrow();
+    }
+  });
+
+  it("requiere Dia de la semana para frecuencias semanales/quincenales", () => {
+    for (const frequency of ["WEEKLY", "BIWEEKLY"] as const) {
+      expect(() => validateRecurrenceInput({ ...input, frequency, dayOfMonth: null, dayOfWeek: null }, refs)).toThrow("Dia de la semana");
+      expect(() => validateRecurrenceInput({ ...input, frequency, dayOfMonth: null, dayOfWeek: "0" }, refs)).not.toThrow();
+    }
+  });
+
   it("builds a ten-occurrence preview with adjusted dates", () => {
     const preview = previewRecurrence({ frequency: "MONTHLY", intervalDays: null, startDate: new Date(2026, 0, 31), endDate: null });
 
     expect(preview).toHaveLength(10);
     expect(preview[1].projectedDate.getMonth()).toBe(2);
+  });
+
+  it("la previsualizacion usa Dia del mes / Dia de la semana cuando la regla los trae, igual que el listado de Recurrentes", () => {
+    const monthly = previewRecurrence(
+      { frequency: "MONTHLY", intervalDays: null, dayOfMonth: 22, startDate: new Date(2026, 5, 10), endDate: null },
+      [],
+      2
+    );
+    expect(monthly.map((item) => item.occurrenceDate.getDate())).toEqual([22, 22]);
+
+    const weekly = previewRecurrence(
+      { frequency: "WEEKLY", intervalDays: null, dayOfWeek: 5, startDate: new Date(2026, 5, 15), endDate: null },
+      [],
+      2
+    );
+    expect(weekly.map((item) => item.occurrenceDate.getDay())).toEqual([5, 5]);
   });
 
   it("deactivates without deleting history", () => {

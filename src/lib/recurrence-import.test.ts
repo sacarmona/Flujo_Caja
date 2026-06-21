@@ -120,4 +120,39 @@ describe("resolveRecurrenceImportRow", () => {
       expect(result.errors.join(" ")).toContain("descripcion");
     }
   });
+
+  it("exige Dia del mes para frecuencias mensuales y similares", () => {
+    const result = resolveRecurrenceImportRow(baseRow({ Frecuencia: "Trimestral", "Dia del mes": "" }), 2, refs);
+
+    expect(result.status).toBe("error");
+    if (result.status === "error") {
+      expect(result.errors.join(" ")).toContain("Dia del mes");
+    }
+  });
+
+  it("exige Dia de la semana para Semanal y Quincenal", () => {
+    const result = resolveRecurrenceImportRow(
+      baseRow({ Frecuencia: "Quincenal", "Dia del mes": "", "Dia de la semana (0=Domingo)": "" }),
+      2,
+      refs
+    );
+
+    expect(result.status).toBe("error");
+    if (result.status === "error") {
+      expect(result.errors.join(" ")).toContain("Dia de la semana");
+    }
+  });
+
+  it("acepta Semanal cuando Dia de la semana viene informado", () => {
+    const result = resolveRecurrenceImportRow(
+      baseRow({ Frecuencia: "Semanal", "Dia del mes": "", "Dia de la semana (0=Domingo)": "1" }),
+      2,
+      refs
+    );
+
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      expect(result.input.dayOfWeek).toBe("1");
+    }
+  });
 });

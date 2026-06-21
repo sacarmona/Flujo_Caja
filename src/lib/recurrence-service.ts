@@ -53,6 +53,8 @@ export async function generateMovementsForRecurrence(ruleId: string, options: Re
       {
         frequency: rule.frequency,
         intervalDays: rule.intervalDays,
+        dayOfMonth: rule.dayOfMonth,
+        dayOfWeek: rule.dayOfWeek,
         startDate: rule.startDate,
         endDate: rule.endDate
       },

@@ -61,11 +61,37 @@ describe("recurrence engine", () => {
     expect(
       keys(generateRecurrenceOccurrences({ frequency: "EVERY_N_DAYS", intervalDays: 10, startDate: new Date(2026, 0, 1) }, { months: 1 }))
     ).toEqual(["2026-01-01", "2026-01-12", "2026-01-21", "2026-02-02"]);
+    // Quincenal avanza cada 14 dias (2 semanas exactas) para mantener el mismo dia de la semana en cada ocurrencia.
     expect(keys(generateRecurrenceOccurrences({ frequency: "BIWEEKLY", startDate: new Date(2026, 0, 1) }, { months: 1 }))).toEqual([
       "2026-01-01",
-      "2026-01-16",
-      "2026-02-02"
+      "2026-01-15",
+      "2026-01-29"
     ]);
+  });
+
+  it("ancla el dia de mes/semana al campo, no a la Fecha de inicio, una vez que la regla lo especifica", () => {
+    // Inicio 10-jun (martes), Dia del mes = 22: la primera ocurrencia no es el 10, sino el 22-jun.
+    expect(
+      keys(
+        generateRecurrenceOccurrences({ frequency: "MONTHLY", startDate: new Date(2026, 5, 10), dayOfMonth: 22 }, { months: 2 })
+      )
+    ).toEqual(["2026-06-22", "2026-07-22"]);
+
+    // Inicio 25-jun, Dia del mes = 5: como el 5 de junio ya paso, la primera ocurrencia salta a julio.
+    // El 05-07-2026 es domingo, por eso la fecha proyectada se mueve al lunes 06-07-2026.
+    expect(
+      keys(generateRecurrenceOccurrences({ frequency: "MONTHLY", startDate: new Date(2026, 5, 25), dayOfMonth: 5 }, { months: 2 }))
+    ).toEqual(["2026-07-06", "2026-08-05"]);
+
+    // Inicio lunes 2026-06-15, Dia de la semana = 5 (viernes): primera ocurrencia el viernes siguiente, luego cada 7 dias.
+    expect(
+      keys(generateRecurrenceOccurrences({ frequency: "WEEKLY", startDate: new Date(2026, 5, 15), dayOfWeek: 5 }, { months: 1 }))
+    ).toEqual(["2026-06-19", "2026-06-26", "2026-07-03", "2026-07-10"]);
+
+    // Sin Dia del mes/semana definido, se mantiene el comportamiento anterior (usa el dia de Fecha de inicio).
+    expect(
+      keys(generateRecurrenceOccurrences({ frequency: "MONTHLY", startDate: new Date(2026, 5, 10) }, { months: 1 }))
+    ).toEqual(["2026-06-10", "2026-07-10"]);
   });
 
   it("generates quarterly, semiannual and annual occurrences", () => {

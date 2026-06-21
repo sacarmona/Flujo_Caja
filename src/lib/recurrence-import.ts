@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import type { Currency, MovementType, RecurrenceFrequency } from "@prisma/client";
 import { movementCurrencies } from "./movements";
-import { validateRecurrenceInput, type RecurrenceFormInput, type RecurrenceReference } from "./recurrence-rules";
+import { monthlyDayFrequencies, validateRecurrenceInput, weeklyDayFrequencies, type RecurrenceFormInput, type RecurrenceReference } from "./recurrence-rules";
 import type { RecurrenceImportRowResult } from "./recurrence-import-state";
 
 export const recurrenceImportColumns = [
@@ -60,13 +60,12 @@ const frequencyByLabel: Record<string, RecurrenceFrequency> = {
 };
 
 /**
- * El dia/dia de la semana de cada ocurrencia se calcula a partir de la
- * Fecha de inicio (mismo dia de cada mes/semana, ajustado al ultimo dia
- * del mes si no existe). Solo "Cada N dias" usa un campo adicional
- * (Intervalo dias); "Dia del mes" y "Dia de la semana" son informativos y
- * no afectan el calculo. Estas notas se vuelcan en la hoja "Frecuencias"
- * de la plantilla para que el usuario no las llene pensando que son
- * obligatorias.
+ * Fecha de inicio/termino delimitan la ventana de la recurrencia; el dia en
+ * que cae cada ocurrencia lo fija "Dia del mes" (mensual/trimestral/
+ * semestral/anual, con clamp al ultimo dia si el mes es mas corto) o "Dia
+ * de la semana" (semanal/quincenal). La primera ocurrencia es la primera
+ * fecha >= Fecha de inicio que cae en ese dia/dia de semana. Estas notas se
+ * vuelcan en la hoja "Frecuencias" de la plantilla.
  */
 const recurrenceFrequencyGuide: Array<{ label: string; description: string }> = [
   { label: "Diaria", description: "Una ocurrencia cada dia, incluyendo fines de semana y feriados." },
@@ -77,17 +76,19 @@ const recurrenceFrequencyGuide: Array<{ label: string; description: string }> = 
   },
   {
     label: "Semanal",
-    description: "Cada 7 dias desde la Fecha de inicio. El dia de la semana lo define la Fecha de inicio; no es necesario llenar 'Dia de la semana'."
+    description: "Cada 7 dias, en el dia de la semana indicado en 'Dia de la semana' (obligatorio, 0=Domingo...6=Sabado)."
   },
-  { label: "Quincenal", description: "Cada 15 dias desde la Fecha de inicio." },
+  {
+    label: "Quincenal",
+    description: "Cada 14 dias (2 semanas exactas), en el dia de la semana indicado en 'Dia de la semana' (obligatorio)."
+  },
   {
     label: "Mensual",
-    description:
-      "Cada mes, en el mismo dia que la Fecha de inicio (si ese dia no existe en un mes, se ajusta al ultimo dia). No es necesario llenar 'Dia del mes'."
+    description: "Cada mes, en el dia indicado en 'Dia del mes' (obligatorio; si ese dia no existe en un mes, se ajusta al ultimo dia)."
   },
-  { label: "Trimestral", description: "Cada 3 meses, mismo dia que la Fecha de inicio." },
-  { label: "Semestral", description: "Cada 6 meses, mismo dia que la Fecha de inicio." },
-  { label: "Anual", description: "Cada 12 meses, mismo dia que la Fecha de inicio." }
+  { label: "Trimestral", description: "Cada 3 meses, en el dia indicado en 'Dia del mes' (obligatorio)." },
+  { label: "Semestral", description: "Cada 6 meses, en el dia indicado en 'Dia del mes' (obligatorio)." },
+  { label: "Anual", description: "Cada 12 meses, en el dia indicado en 'Dia del mes' (obligatorio)." }
 ];
 
 export type RecurrenceImportRawRow = Record<string, string>;
@@ -303,6 +304,16 @@ export function resolveRecurrenceImportRow(
   const frequency = frequencyByLabel[normalize(frequencyRawText)];
   if (!frequency) {
     errors.push(`Frecuencia "${frequencyRawText}" invalida.`);
+  }
+
+  const dayOfMonthText = get("Dia del mes");
+  if (frequency && (monthlyDayFrequencies as readonly RecurrenceFrequency[]).includes(frequency) && !dayOfMonthText) {
+    errors.push(`"Dia del mes" es obligatorio para la frecuencia "${frequencyRawText}".`);
+  }
+
+  const dayOfWeekText = get("Dia de la semana (0=Domingo)");
+  if (frequency && (weeklyDayFrequencies as readonly RecurrenceFrequency[]).includes(frequency) && !dayOfWeekText) {
+    errors.push(`"Dia de la semana" es obligatorio para la frecuencia "${frequencyRawText}".`);
   }
 
   const startDateText = get("Fecha inicio (DD-MM-AAAA)");

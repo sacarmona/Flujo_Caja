@@ -287,6 +287,8 @@ export async function updateRecurrenceAction(formData: FormData) {
       {
         frequency: saved.frequency,
         intervalDays: saved.intervalDays,
+        dayOfMonth: saved.dayOfMonth,
+        dayOfWeek: saved.dayOfWeek,
         startDate: saved.startDate,
         endDate: saved.endDate
       },

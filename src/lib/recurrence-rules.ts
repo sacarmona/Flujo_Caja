@@ -15,6 +15,12 @@ export const recurrenceFrequencies = [
   "ANNUAL"
 ] as const satisfies RecurrenceFrequency[];
 
+/** Frecuencias cuyo dia de ocurrencia lo fija "Dia del mes" (ver generateRecurrenceOccurrences). */
+export const monthlyDayFrequencies = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"] as const satisfies RecurrenceFrequency[];
+
+/** Frecuencias cuyo dia de ocurrencia lo fija "Dia de la semana". */
+export const weeklyDayFrequencies = ["WEEKLY", "BIWEEKLY"] as const satisfies RecurrenceFrequency[];
+
 export type RecurrenceFormInput = {
   type: MovementType;
   accountingAccountId: string;
@@ -134,6 +140,16 @@ export function validateRecurrenceInput(input: RecurrenceFormInput, refs: Recurr
     throw new Error("Cada N dias requiere intervalo.");
   }
 
+  const dayOfMonth = optionalInteger(input.dayOfMonth, "Dia del mes", 1, 31);
+  if ((monthlyDayFrequencies as readonly RecurrenceFrequency[]).includes(input.frequency) && dayOfMonth === null) {
+    throw new Error("Dia del mes es obligatorio para esta frecuencia.");
+  }
+
+  const dayOfWeek = optionalInteger(input.dayOfWeek, "Dia de la semana", 0, 6);
+  if ((weeklyDayFrequencies as readonly RecurrenceFrequency[]).includes(input.frequency) && dayOfWeek === null) {
+    throw new Error("Dia de la semana es obligatoria para esta frecuencia.");
+  }
+
   return {
     type: input.type,
     accountingAccountId: input.accountingAccountId,
@@ -146,8 +162,8 @@ export function validateRecurrenceInput(input: RecurrenceFormInput, refs: Recurr
     costCenterId: input.costCenterId,
     frequency: input.frequency,
     intervalDays,
-    dayOfMonth: optionalInteger(input.dayOfMonth, "Dia del mes", 1, 31),
-    dayOfWeek: optionalInteger(input.dayOfWeek, "Dia de la semana", 0, 6),
+    dayOfMonth,
+    dayOfWeek,
     startDate,
     endDate,
     status: input.status,
@@ -159,6 +175,8 @@ export function previewRecurrence(
   recurrence: {
     frequency: RecurrenceFrequency;
     intervalDays: number | null;
+    dayOfMonth?: number | null;
+    dayOfWeek?: number | null;
     startDate: Date;
     endDate: Date | null;
   },
@@ -169,6 +187,8 @@ export function previewRecurrence(
     {
       frequency: recurrence.frequency,
       intervalDays: recurrence.intervalDays,
+      dayOfMonth: recurrence.dayOfMonth,
+      dayOfWeek: recurrence.dayOfWeek,
       startDate: recurrence.startDate,
       endDate: recurrence.endDate
     },
