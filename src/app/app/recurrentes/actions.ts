@@ -483,6 +483,12 @@ export async function generateRecurringMovementsAction(formData: FormData) {
   });
   revalidatePath("/app/recurrentes");
   revalidatePath("/app/movimientos");
+
+  if (result.conversionErrors.length > 0) {
+    throw new Error(
+      `Se generaron ${result.created} movimientos. No se pudo obtener la tasa de cambio para ${result.conversionErrors.length} fecha(s): ${result.conversionErrors.join(" | ")}. Agrega una tasa manual a la regla para esas fechas o reintenta mas tarde.`
+    );
+  }
 }
 
 export async function getRecurrenceDefaults(companyId: string) {

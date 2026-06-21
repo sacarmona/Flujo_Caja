@@ -39,7 +39,7 @@ export async function generateMovementsForRecurrence(ruleId: string, options: Re
     });
 
     if (!rule || !rule.isActive) {
-      return { created: 0, skipped: 0 };
+      return { created: 0, skipped: 0, conversionErrors: [] as string[] };
     }
 
     const existingKeys = rule.movements
@@ -67,17 +67,24 @@ export async function generateMovementsForRecurrence(ruleId: string, options: Re
     const occurrences = filterNewRecurrenceOccurrences(generatedOccurrences, existingProjectedDateKeys);
 
     let created = 0;
+    const conversionErrors: string[] = [];
 
     for (const occurrence of occurrences) {
-      const conversion = await resolveConversionAllowManualFallback({
-        amount: rule.amount,
-        currency: rule.currency,
-        date: occurrence.projectedDate,
-        provider: options.exchangeRateProvider,
-        manualRate: rule.manualRate?.toString() ?? null,
-        manualReason: rule.manualRateReason,
-        preferAutomatic: true
-      });
+      let conversion;
+      try {
+        conversion = await resolveConversionAllowManualFallback({
+          amount: rule.amount,
+          currency: rule.currency,
+          date: occurrence.projectedDate,
+          provider: options.exchangeRateProvider,
+          manualRate: rule.manualRate?.toString() ?? null,
+          manualReason: rule.manualRateReason,
+          preferAutomatic: true
+        });
+      } catch (error) {
+        conversionErrors.push(`${dateKey(occurrence.projectedDate)}: ${error instanceof Error ? error.message : "error desconocido"}`);
+        continue;
+      }
 
       await tx.movement.create({
         data: {
@@ -103,7 +110,7 @@ export async function generateMovementsForRecurrence(ruleId: string, options: Re
       created += 1;
     }
 
-    return { created, skipped: existingKeys.length + (generatedOccurrences.length - occurrences.length) };
+    return { created, skipped: existingKeys.length + (generatedOccurrences.length - occurrences.length), conversionErrors };
   });
 }
 
