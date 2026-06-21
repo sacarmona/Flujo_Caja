@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 import type { MovementStatus } from "@prisma/client";
 import { generateRecurrenceOccurrences, dateKey } from "./recurrences";
@@ -26,67 +27,75 @@ export function filterNewRecurrenceOccurrences<T extends { projectedDate: Date }
   return occurrences.filter((occurrence) => !existing.has(dateKey(occurrence.projectedDate)));
 }
 
+/**
+ * No usa $transaction interactiva: resolver la tasa de cambio puede implicar
+ * una llamada de red a mindicador.cl por cada ocurrencia, y el limite de una
+ * transaccion interactiva de Prisma es de 5s en total. Con varias ocurrencias
+ * sin tasa cacheada eso se agota facil. El indice unico
+ * (recurrenceRuleId, recurrenceOccurrenceDate) ya evita duplicados sin
+ * necesidad de una transaccion que envuelva todo.
+ */
 export async function generateMovementsForRecurrence(ruleId: string, options: RecurrenceServiceOptions) {
-  return options.prisma.$transaction(async (tx) => {
-    const rule = await tx.recurrenceRule.findUnique({
-      where: { id: ruleId },
-      include: {
-        movements: {
-          where: { recurrenceOccurrenceDate: { not: null } },
-          select: { recurrenceOccurrenceDate: true, projectedDate: true, deletedAt: true }
-        }
+  const rule = await options.prisma.recurrenceRule.findUnique({
+    where: { id: ruleId },
+    include: {
+      movements: {
+        where: { recurrenceOccurrenceDate: { not: null } },
+        select: { recurrenceOccurrenceDate: true, projectedDate: true, deletedAt: true }
       }
-    });
+    }
+  });
 
-    if (!rule || !rule.isActive) {
-      return { created: 0, skipped: 0, conversionErrors: [] as string[] };
+  if (!rule || !rule.isActive) {
+    return { created: 0, skipped: 0, conversionErrors: [] as string[] };
+  }
+
+  const existingKeys = rule.movements
+    .map((movement) => movement.recurrenceOccurrenceDate)
+    .filter((date): date is Date => Boolean(date))
+    .map(dateKey);
+  const existingProjectedDateKeys = rule.movements
+    .filter((movement) => !movement.deletedAt)
+    .map((movement) => dateKey(movement.projectedDate));
+  const generatedOccurrences = generateRecurrenceOccurrences(
+    {
+      frequency: rule.frequency,
+      intervalDays: rule.intervalDays,
+      dayOfMonth: rule.dayOfMonth,
+      dayOfWeek: rule.dayOfWeek,
+      startDate: rule.startDate,
+      endDate: rule.endDate
+    },
+    {
+      holidays: options.holidays,
+      months: options.months ?? 12,
+      existingOccurrenceKeys: existingKeys
+    }
+  );
+  const occurrences = filterNewRecurrenceOccurrences(generatedOccurrences, existingProjectedDateKeys);
+
+  let created = 0;
+  const conversionErrors: string[] = [];
+
+  for (const occurrence of occurrences) {
+    let conversion;
+    try {
+      conversion = await resolveConversionAllowManualFallback({
+        amount: rule.amount,
+        currency: rule.currency,
+        date: occurrence.projectedDate,
+        provider: options.exchangeRateProvider,
+        manualRate: rule.manualRate?.toString() ?? null,
+        manualReason: rule.manualRateReason,
+        preferAutomatic: true
+      });
+    } catch (error) {
+      conversionErrors.push(`${dateKey(occurrence.projectedDate)}: ${error instanceof Error ? error.message : "error desconocido"}`);
+      continue;
     }
 
-    const existingKeys = rule.movements
-      .map((movement) => movement.recurrenceOccurrenceDate)
-      .filter((date): date is Date => Boolean(date))
-      .map(dateKey);
-    const existingProjectedDateKeys = rule.movements
-      .filter((movement) => !movement.deletedAt)
-      .map((movement) => dateKey(movement.projectedDate));
-    const generatedOccurrences = generateRecurrenceOccurrences(
-      {
-        frequency: rule.frequency,
-        intervalDays: rule.intervalDays,
-        dayOfMonth: rule.dayOfMonth,
-        dayOfWeek: rule.dayOfWeek,
-        startDate: rule.startDate,
-        endDate: rule.endDate
-      },
-      {
-        holidays: options.holidays,
-        months: options.months ?? 12,
-        existingOccurrenceKeys: existingKeys
-      }
-    );
-    const occurrences = filterNewRecurrenceOccurrences(generatedOccurrences, existingProjectedDateKeys);
-
-    let created = 0;
-    const conversionErrors: string[] = [];
-
-    for (const occurrence of occurrences) {
-      let conversion;
-      try {
-        conversion = await resolveConversionAllowManualFallback({
-          amount: rule.amount,
-          currency: rule.currency,
-          date: occurrence.projectedDate,
-          provider: options.exchangeRateProvider,
-          manualRate: rule.manualRate?.toString() ?? null,
-          manualReason: rule.manualRateReason,
-          preferAutomatic: true
-        });
-      } catch (error) {
-        conversionErrors.push(`${dateKey(occurrence.projectedDate)}: ${error instanceof Error ? error.message : "error desconocido"}`);
-        continue;
-      }
-
-      await tx.movement.create({
+    try {
+      await options.prisma.movement.create({
         data: {
           companyId: rule.companyId,
           recurrenceRuleId: rule.id,
@@ -108,10 +117,15 @@ export async function generateMovementsForRecurrence(ruleId: string, options: Re
         }
       });
       created += 1;
+    } catch (error) {
+      // Otra solicitud ya creo un movimiento para esta misma fecha (ver indice unico en Movement).
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+        throw error;
+      }
     }
+  }
 
-    return { created, skipped: existingKeys.length + (generatedOccurrences.length - occurrences.length), conversionErrors };
-  });
+  return { created, skipped: existingKeys.length + (generatedOccurrences.length - occurrences.length), conversionErrors };
 }
 
 export async function deactivateRecurrenceRule(ruleId: string, prisma: PrismaClient) {

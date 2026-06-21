@@ -57,11 +57,10 @@ describe("recurrence service status rules", () => {
       manualRateReason: null
     };
 
-    const tx = {
+    const prisma = {
       recurrenceRule: { findUnique: vi.fn().mockResolvedValue(rule) },
       movement: { create: vi.fn().mockResolvedValue({}) }
     };
-    const prisma = { $transaction: (fn: (transactionClient: typeof tx) => unknown) => fn(tx) } as never;
 
     const provider = {
       getRate: vi.fn().mockImplementation((_currency: string, date: Date) => {
@@ -73,7 +72,7 @@ describe("recurrence service status rules", () => {
     };
 
     const result = await generateMovementsForRecurrence("rule-1", {
-      prisma,
+      prisma: prisma as never,
       exchangeRateProvider: provider as never,
       months: 2
     });
@@ -81,6 +80,6 @@ describe("recurrence service status rules", () => {
     expect(result.created).toBe(2);
     expect(result.conversionErrors).toHaveLength(1);
     expect(result.conversionErrors[0]).toContain("no tiene dato de USD");
-    expect(tx.movement.create).toHaveBeenCalledTimes(2);
+    expect(prisma.movement.create).toHaveBeenCalledTimes(2);
   });
 });

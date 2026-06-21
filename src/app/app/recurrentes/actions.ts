@@ -223,53 +223,87 @@ export async function updateRecurrenceAction(formData: FormData) {
   const input = formInput(formData);
   const data = validateRecurrenceInput(input, await references(user.companyId, input));
   const holidays = await getHolidayKeys(prisma);
+
+  /**
+   * El indice unico (recurrenceRuleId, recurrenceOccurrenceDate) no excluye
+   * filas con deletedAt seteado. Movimientos borrados antes de liberar esa
+   * fecha (desactivar/cancelar la regla) quedan "reservando" la fecha para
+   * siempre y rompen la regeneracion de ocurrencias con P2002. Se libera
+   * aqui antes de generar las nuevas ocurrencias.
+   */
+  await prisma.movement.updateMany({
+    where: { recurrenceRuleId: id, deletedAt: { not: null }, recurrenceOccurrenceDate: { not: null } },
+    data: { recurrenceOccurrenceDate: null }
+  });
+
+  const movements = await prisma.movement.findMany({
+    where: {
+      companyId: user.companyId,
+      recurrenceRuleId: id,
+      deletedAt: null
+    },
+    orderBy: [{ recurrenceOccurrenceDate: "asc" }, { projectedDate: "asc" }, { createdAt: "asc" }]
+  });
+  const preservedKeys = movements
+    .filter((movement) => shouldPreserveRecurrenceMovement(movement.status))
+    .map((movement) => movement.recurrenceOccurrenceDate)
+    .filter((date): date is Date => Boolean(date))
+    .map(dateKey);
+  const rewriteMovements = movements.filter((movement) => shouldRewriteRecurrenceMovement(movement.status));
+  const occurrences = generateRecurrenceOccurrences(
+    {
+      frequency: data.frequency,
+      intervalDays: data.intervalDays,
+      dayOfMonth: data.dayOfMonth,
+      dayOfWeek: data.dayOfWeek,
+      startDate: data.startDate,
+      endDate: data.endDate
+    },
+    {
+      holidays,
+      months: 12,
+      existingOccurrenceKeys: preservedKeys
+    }
+  );
+
+  /**
+   * Resuelve las tasas de cambio ANTES de abrir la transaccion: una consulta
+   * a mindicador.cl por ocurrencia puede tardar mas que el limite de 5s de
+   * una transaccion interactiva de Prisma si hay varias fechas sin tasa
+   * cacheada. Las ocurrencias sin tasa disponible se saltan (ver
+   * conversionErrors) en vez de bloquear toda la edicion.
+   */
+  const provider = new CachedHttpExchangeRateProvider(prisma, user.companyId);
+  const conversionsByMovementId = new Map<string, Awaited<ReturnType<typeof resolveConversionAllowManualFallback>>>();
+  const conversionErrors: string[] = [];
+
+  for (const [index, movement] of rewriteMovements.entries()) {
+    const occurrence = occurrences[index];
+    if (!occurrence) {
+      continue;
+    }
+
+    try {
+      const conversion = await resolveConversionAllowManualFallback({
+        amount: data.amount,
+        currency: data.currency,
+        date: occurrence.projectedDate,
+        provider,
+        manualRate: data.manualRate?.toString() ?? null,
+        manualReason: data.manualRateReason,
+        preferAutomatic: true
+      });
+      conversionsByMovementId.set(movement.id, conversion);
+    } catch (error) {
+      conversionErrors.push(`${dateKey(occurrence.projectedDate)}: ${error instanceof Error ? error.message : "error desconocido"}`);
+    }
+  }
+
   await prisma.$transaction(async (tx) => {
     const saved = await tx.recurrenceRule.update({
       where: { id },
       data
     });
-
-    /**
-     * El indice unico (recurrenceRuleId, recurrenceOccurrenceDate) no excluye
-     * filas con deletedAt seteado. Movimientos borrados antes de liberar esa
-     * fecha (desactivar/cancelar la regla) quedan "reservando" la fecha para
-     * siempre y rompen la regeneracion de ocurrencias con P2002. Se libera
-     * aqui antes de generar las nuevas ocurrencias.
-     */
-    await tx.movement.updateMany({
-      where: { recurrenceRuleId: id, deletedAt: { not: null }, recurrenceOccurrenceDate: { not: null } },
-      data: { recurrenceOccurrenceDate: null }
-    });
-
-    const movements = await tx.movement.findMany({
-      where: {
-        companyId: user.companyId,
-        recurrenceRuleId: id,
-        deletedAt: null
-      },
-      orderBy: [{ recurrenceOccurrenceDate: "asc" }, { projectedDate: "asc" }, { createdAt: "asc" }]
-    });
-    const preservedKeys = movements
-      .filter((movement) => shouldPreserveRecurrenceMovement(movement.status))
-      .map((movement) => movement.recurrenceOccurrenceDate)
-      .filter((date): date is Date => Boolean(date))
-      .map(dateKey);
-    const rewriteMovements = movements.filter((movement) => shouldRewriteRecurrenceMovement(movement.status));
-    const occurrences = generateRecurrenceOccurrences(
-      {
-        frequency: saved.frequency,
-        intervalDays: saved.intervalDays,
-        dayOfMonth: saved.dayOfMonth,
-        dayOfWeek: saved.dayOfWeek,
-        startDate: saved.startDate,
-        endDate: saved.endDate
-      },
-      {
-        holidays,
-        months: 12,
-        existingOccurrenceKeys: preservedKeys
-      }
-    );
 
     if (rewriteMovements.length > 0) {
       await tx.movement.updateMany({
@@ -307,15 +341,11 @@ export async function updateRecurrenceAction(formData: FormData) {
         continue;
       }
 
-      const conversion = await resolveConversionAllowManualFallback({
-        amount: saved.amount,
-        currency: saved.currency,
-        date: occurrence.projectedDate,
-        provider: new CachedHttpExchangeRateProvider(tx, user.companyId),
-        manualRate: saved.manualRate?.toString() ?? null,
-        manualReason: saved.manualRateReason,
-        preferAutomatic: true
-      });
+      const conversion = conversionsByMovementId.get(movement.id);
+      if (!conversion) {
+        // Sin tasa disponible para esta fecha (ver conversionErrors); se deja el movimiento sin tocar.
+        continue;
+      }
 
       const updatedMovement = await tx.movement.update({
         where: { id: movement.id },
@@ -368,6 +398,7 @@ export async function updateRecurrenceAction(formData: FormData) {
           source: "recurrence-series-update",
           rewrittenMovements: rewriteMovements.length,
           preservedMovements: movements.length - rewriteMovements.length,
+          conversionErrors,
           generatedAdditionalMovements: 0
         }
       }
@@ -379,6 +410,12 @@ export async function updateRecurrenceAction(formData: FormData) {
   revalidatePath("/app/recurrentes");
   revalidatePath("/app/movimientos");
   revalidatePath("/app/calendario");
+
+  if (conversionErrors.length > 0) {
+    throw new Error(
+      `La regla se actualizo, pero no se pudo obtener la tasa de cambio para ${conversionErrors.length} fecha(s): ${conversionErrors.join(" | ")}. Esos movimientos quedaron sin actualizar; agrega una tasa manual a la regla y reintenta.`
+    );
+  }
 }
 
 export async function setRecurrenceActiveAction(formData: FormData) {
