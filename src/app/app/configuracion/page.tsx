@@ -97,57 +97,65 @@ function AccountEditor({
         </div>
 
         {isAdmin ? (
-          <form action={updateAccountingAccountAction} className="mt-4 grid gap-3 border-t border-slate-100 pt-4 md:grid-cols-6">
-            <input name="id" type="hidden" value={account.id} />
-            <label className="text-sm md:col-span-1">
-              <span className="mb-1 block text-slate-600">Codigo</span>
-              <input className="w-full rounded-md border border-slate-300 px-2 py-2" name="code" required defaultValue={account.code} />
-            </label>
-            <label className="text-sm md:col-span-2">
-              <span className="mb-1 block text-slate-600">Nombre</span>
-              <input className="w-full rounded-md border border-slate-300 px-2 py-2" name="name" required defaultValue={account.name} />
-            </label>
-            <label className="text-sm md:col-span-1">
-              <span className="mb-1 block text-slate-600">Orden</span>
-              <input
-                className="w-full rounded-md border border-slate-300 px-2 py-2"
-                name="sortOrder"
-                type="number"
-                defaultValue={account.sortOrder}
-              />
-            </label>
-            <label className="text-sm md:col-span-2">
-              <span className="mb-1 block text-slate-600">Cuenta padre</span>
-              <select className="w-full rounded-md border border-slate-300 px-2 py-2" name="parentId" defaultValue={account.parentId ?? ""}>
-                <AccountOptions accounts={accounts} currentId={account.id} />
-              </select>
-            </label>
-            <label className="text-sm md:col-span-2">
-              <span className="mb-1 block text-slate-600">Tipo</span>
-              <select className="w-full rounded-md border border-slate-300 px-2 py-2" name="type" defaultValue={account.type}>
-                <TypeOptions />
-              </select>
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input name="isActive" type="checkbox" defaultChecked={account.isActive} />
-              Activa
-            </label>
-            <label className="flex items-center gap-2 text-sm md:col-span-2">
-              <input
-                name="allowMovements"
-                type="checkbox"
-                defaultChecked={account.allowMovements}
-                disabled={(account._count?.children ?? 0) > 0}
-              />
-              Permite movimientos
-            </label>
-            <button
-              className="rounded-md bg-adentu-blue px-3 py-2 text-sm font-semibold text-white transition hover:bg-adentu-teal md:col-span-1"
-              type="submit"
-            >
-              Guardar
-            </button>
-          </form>
+          <details className="group mt-3 border-t border-slate-100 pt-3">
+            <summary className="cursor-pointer list-none text-sm font-medium text-adentu-blue">
+              <span className="inline-flex items-center gap-2">
+                <span className="transition-transform group-open:rotate-90">▶</span>
+                Editar
+              </span>
+            </summary>
+            <form action={updateAccountingAccountAction} className="mt-3 grid gap-3 md:grid-cols-6">
+              <input name="id" type="hidden" value={account.id} />
+              <label className="text-sm md:col-span-1">
+                <span className="mb-1 block text-slate-600">Codigo</span>
+                <input className="w-full rounded-md border border-slate-300 px-2 py-2" name="code" required defaultValue={account.code} />
+              </label>
+              <label className="text-sm md:col-span-2">
+                <span className="mb-1 block text-slate-600">Nombre</span>
+                <input className="w-full rounded-md border border-slate-300 px-2 py-2" name="name" required defaultValue={account.name} />
+              </label>
+              <label className="text-sm md:col-span-1">
+                <span className="mb-1 block text-slate-600">Orden</span>
+                <input
+                  className="w-full rounded-md border border-slate-300 px-2 py-2"
+                  name="sortOrder"
+                  type="number"
+                  defaultValue={account.sortOrder}
+                />
+              </label>
+              <label className="text-sm md:col-span-2">
+                <span className="mb-1 block text-slate-600">Cuenta padre</span>
+                <select className="w-full rounded-md border border-slate-300 px-2 py-2" name="parentId" defaultValue={account.parentId ?? ""}>
+                  <AccountOptions accounts={accounts} currentId={account.id} />
+                </select>
+              </label>
+              <label className="text-sm md:col-span-2">
+                <span className="mb-1 block text-slate-600">Tipo</span>
+                <select className="w-full rounded-md border border-slate-300 px-2 py-2" name="type" defaultValue={account.type}>
+                  <TypeOptions />
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input name="isActive" type="checkbox" defaultChecked={account.isActive} />
+                Activa
+              </label>
+              <label className="flex items-center gap-2 text-sm md:col-span-2">
+                <input
+                  name="allowMovements"
+                  type="checkbox"
+                  defaultChecked={account.allowMovements}
+                  disabled={(account._count?.children ?? 0) > 0}
+                />
+                Permite movimientos
+              </label>
+              <button
+                className="rounded-md bg-adentu-blue px-3 py-2 text-sm font-semibold text-white transition hover:bg-adentu-teal md:col-span-1"
+                type="submit"
+              >
+                Guardar
+              </button>
+            </form>
+          </details>
         ) : null}
       </div>
 
