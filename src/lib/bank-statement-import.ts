@@ -1,6 +1,9 @@
-import ExcelJS from "exceljs";
+import * as XLSX from "xlsx";
 import { Prisma } from "@prisma/client";
 import type { BankMovementType } from "@prisma/client";
+
+type SheetCell = string | number | Date | undefined;
+type SheetRow = SheetCell[];
 
 export type BankStatementRawRow = {
   rowNumber: number;
@@ -31,7 +34,7 @@ const headerTargets = {
  * del banco, que difieren en redaccion exacta, se puedan detectar con la
  * misma lista de objetivos.
  */
-function normalizeHeader(value: unknown): string {
+function normalizeHeader(value: SheetCell): string {
   return String(value ?? "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -39,15 +42,12 @@ function normalizeHeader(value: unknown): string {
     .replace(/[^a-z0-9]/g, "");
 }
 
-function cellNumber(value: unknown): Prisma.Decimal | null {
+function cellNumber(value: SheetCell): Prisma.Decimal | null {
   if (value === null || value === undefined || value === "") {
     return null;
   }
   if (typeof value === "number") {
     return new Prisma.Decimal(value);
-  }
-  if (typeof value === "object" && value !== null && "result" in (value as Record<string, unknown>)) {
-    return cellNumber((value as { result: unknown }).result);
   }
   const cleaned = String(value).trim().replace(/\./g, "").replace(",", ".");
   if (!cleaned || !/^-?\d+(\.\d+)?$/.test(cleaned)) {
@@ -56,20 +56,17 @@ function cellNumber(value: unknown): Prisma.Decimal | null {
   return new Prisma.Decimal(cleaned);
 }
 
-function cellText(value: unknown): string {
+function cellText(value: SheetCell): string {
   if (value === null || value === undefined) {
     return "";
   }
-  if (typeof value === "object" && value !== null && "result" in (value as Record<string, unknown>)) {
-    return cellText((value as { result: unknown }).result);
-  }
-  if (typeof value === "object" && value !== null && "text" in (value as Record<string, unknown>)) {
-    return cellText((value as { text: unknown }).text);
+  if (value instanceof Date) {
+    return value.toISOString();
   }
   return String(value).trim();
 }
 
-function cellDate(value: unknown): Date | null {
+function cellDate(value: SheetCell): Date | null {
   if (value instanceof Date) {
     return new Date(value.getFullYear(), value.getMonth(), value.getDate());
   }
@@ -83,7 +80,7 @@ function cellDate(value: unknown): Date | null {
 }
 
 type HeaderRowInfo = {
-  rowNumber: number;
+  rowIndex: number;
   columns: Record<string, number>;
   format: "copiado" | "descargado";
 };
@@ -96,30 +93,29 @@ type HeaderRowInfo = {
  * Se busca la fila de encabezado por contenido en vez de asumir una
  * posicion fija, para que ambos formatos se detecten automaticamente.
  */
-function findHeaderRow(sheet: ExcelJS.Worksheet): HeaderRowInfo | null {
-  for (let rowNumber = 1; rowNumber <= Math.min(sheet.rowCount, 30); rowNumber += 1) {
-    const row = sheet.getRow(rowNumber);
+function findHeaderRow(rows: SheetRow[]): HeaderRowInfo | null {
+  for (let rowIndex = 0; rowIndex < Math.min(rows.length, 30); rowIndex += 1) {
     const columns: Record<string, number> = {};
-    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-      const normalized = normalizeHeader(cell.value);
+    rows[rowIndex].forEach((cell, colIndex) => {
+      const normalized = normalizeHeader(cell);
       if (normalized) {
-        columns[normalized] = colNumber;
+        columns[normalized] = colIndex;
       }
     });
 
     if (headerTargets.fecha in columns && headerTargets.cargo in columns && headerTargets.abono in columns) {
-      return { rowNumber, columns, format: "copiado" };
+      return { rowIndex, columns, format: "copiado" };
     }
     if (headerTargets.monto in columns && headerTargets.cargoAbono in columns) {
-      return { rowNumber, columns, format: "descargado" };
+      return { rowIndex, columns, format: "descargado" };
     }
   }
 
   return null;
 }
 
-function parseCopiedFormat(sheet: ExcelJS.Worksheet, header: HeaderRowInfo): BankStatementRawRow[] {
-  const rows: BankStatementRawRow[] = [];
+function parseCopiedFormat(rows: SheetRow[], header: HeaderRowInfo): BankStatementRawRow[] {
+  const result: BankStatementRawRow[] = [];
   const fechaCol = header.columns[headerTargets.fecha];
   const cargoCol = header.columns[headerTargets.cargo];
   const abonoCol = header.columns[headerTargets.abono];
@@ -127,34 +123,31 @@ function parseCopiedFormat(sheet: ExcelJS.Worksheet, header: HeaderRowInfo): Ban
   const docCol = header.columns[headerTargets.documento];
   const sucursalCol = header.columns[headerTargets.sucursal];
 
-  sheet.eachRow((row, rowNumber) => {
-    if (rowNumber <= header.rowNumber) {
-      return;
-    }
-
-    const date = cellDate(row.getCell(fechaCol).value);
-    const cargo = cellNumber(row.getCell(cargoCol).value);
-    const abono = cellNumber(row.getCell(abonoCol).value);
+  for (let i = header.rowIndex + 1; i < rows.length; i += 1) {
+    const row = rows[i];
+    const date = cellDate(row[fechaCol]);
+    const cargo = cellNumber(row[cargoCol]);
+    const abono = cellNumber(row[abonoCol]);
     if (!date || (!cargo && !abono)) {
-      return;
+      continue;
     }
 
-    rows.push({
-      rowNumber,
+    result.push({
+      rowNumber: i + 1,
       date,
       amount: cargo ? cargo.negated() : (abono as Prisma.Decimal),
       type: cargo ? "CARGO" : "ABONO",
-      description: descCol ? cellText(row.getCell(descCol).value) : "",
-      reference: docCol ? cellText(row.getCell(docCol).value) || null : null,
-      branch: sucursalCol ? cellText(row.getCell(sucursalCol).value) || null : null
+      description: descCol !== undefined ? cellText(row[descCol]) : "",
+      reference: docCol !== undefined ? cellText(row[docCol]) || null : null,
+      branch: sucursalCol !== undefined ? cellText(row[sucursalCol]) || null : null
     });
-  });
+  }
 
-  return rows;
+  return result;
 }
 
-function parseDownloadedFormat(sheet: ExcelJS.Worksheet, header: HeaderRowInfo): BankStatementRawRow[] {
-  const rows: BankStatementRawRow[] = [];
+function parseDownloadedFormat(rows: SheetRow[], header: HeaderRowInfo): BankStatementRawRow[] {
+  const result: BankStatementRawRow[] = [];
   const montoCol = header.columns[headerTargets.monto];
   const fechaCol = header.columns[headerTargets.fecha];
   const descCol = header.columns[headerTargets.descripcionMovimiento];
@@ -162,47 +155,44 @@ function parseDownloadedFormat(sheet: ExcelJS.Worksheet, header: HeaderRowInfo):
   const sucursalCol = header.columns[headerTargets.sucursal];
   const tipoCol = header.columns[headerTargets.cargoAbono];
 
-  sheet.eachRow((row, rowNumber) => {
-    if (rowNumber <= header.rowNumber) {
-      return;
-    }
-
-    const date = cellDate(row.getCell(fechaCol).value);
-    const monto = cellNumber(row.getCell(montoCol).value);
-    const tipoText = cellText(row.getCell(tipoCol).value).toUpperCase();
+  for (let i = header.rowIndex + 1; i < rows.length; i += 1) {
+    const row = rows[i];
+    const date = cellDate(row[fechaCol]);
+    const monto = cellNumber(row[montoCol]);
+    const tipoText = cellText(row[tipoCol]).toUpperCase();
     if (!date || !monto || (tipoText !== "C" && tipoText !== "A")) {
-      return;
+      continue;
     }
 
     const type: BankMovementType = tipoText === "C" ? "CARGO" : "ABONO";
     const amount = type === "CARGO" ? monto.abs().negated() : monto.abs();
 
-    rows.push({
-      rowNumber,
+    result.push({
+      rowNumber: i + 1,
       date,
       amount,
       type,
-      description: descCol ? cellText(row.getCell(descCol).value) : "",
-      reference: docCol ? cellText(row.getCell(docCol).value) || null : null,
-      branch: sucursalCol ? cellText(row.getCell(sucursalCol).value) || null : null
+      description: descCol !== undefined ? cellText(row[descCol]) : "",
+      reference: docCol !== undefined ? cellText(row[docCol]) || null : null,
+      branch: sucursalCol !== undefined ? cellText(row[sucursalCol]) || null : null
     });
-  });
+  }
 
-  return rows;
+  return result;
 }
 
 export async function parseBankStatementFile(buffer: Buffer): Promise<BankStatementRawRow[]> {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
-  const sheet = workbook.worksheets[0];
-  if (!sheet) {
+  const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) {
     return [];
   }
 
-  const header = findHeaderRow(sheet);
+  const rows = XLSX.utils.sheet_to_json<SheetRow>(workbook.Sheets[sheetName], { header: 1, raw: true });
+  const header = findHeaderRow(rows);
   if (!header) {
     throw new Error("No se reconoce el formato de la planilla: no se encontraron las columnas esperadas (Fecha/Cargo/Abono o Monto/Cargo-Abono).");
   }
 
-  return header.format === "copiado" ? parseCopiedFormat(sheet, header) : parseDownloadedFormat(sheet, header);
+  return header.format === "copiado" ? parseCopiedFormat(rows, header) : parseDownloadedFormat(rows, header);
 }
