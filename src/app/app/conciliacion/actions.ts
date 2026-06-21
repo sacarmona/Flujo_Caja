@@ -377,11 +377,21 @@ export async function reverseReconciliationAction(formData: FormData) {
  * Movement asociados todavia), respetando el orden de las relaciones sin
  * onDelete: Cascade en el esquema (Reconciliation -> BankMovement). El
  * BankImportRow original (datos crudos de la fila) se deja como respaldo de
- * auditoria, no bloquea nada al no tener FK hacia BankMovement.
+ * auditoria mientras el lote siga existiendo.
  */
 async function deleteUnconfirmedBankMovement(tx: Prisma.TransactionClient, bankMovementId: string) {
   await tx.reconciliation.deleteMany({ where: { bankMovementId } });
   await tx.bankMovement.delete({ where: { id: bankMovementId } });
+}
+
+/**
+ * BankImportRow no tiene onDelete: Cascade hacia BankImportBatch (FK con
+ * RESTRICT), asi que hay que vaciarla antes de poder borrar un lote que
+ * quedo sin BankMovement.
+ */
+async function deleteEmptyBatch(tx: Prisma.TransactionClient, batchId: string) {
+  await tx.bankImportRow.deleteMany({ where: { batchId } });
+  await tx.bankImportBatch.delete({ where: { id: batchId } });
 }
 
 export async function discardBankMovementAction(formData: FormData) {
@@ -405,7 +415,7 @@ export async function discardBankMovementAction(formData: FormData) {
 
     const remaining = await tx.bankMovement.count({ where: { batchId } });
     if (remaining === 0) {
-      await tx.bankImportBatch.delete({ where: { id: batchId } });
+      await deleteEmptyBatch(tx, batchId);
     }
   });
 
@@ -432,7 +442,7 @@ export async function cancelImportBatchAction(formData: FormData) {
 
     const remaining = await tx.bankMovement.count({ where: { batchId } });
     if (remaining === 0) {
-      await tx.bankImportBatch.delete({ where: { id: batchId } });
+      await deleteEmptyBatch(tx, batchId);
     }
   });
 
