@@ -57,11 +57,25 @@ export function weekOpeningBalance(result: CashFlowResult, weekDays: CashFlowDay
   return result.days[firstDayIndex - 1].accumulatedBalance;
 }
 
+/**
+ * Sugiere la siguiente semana (lunes a domingo) que todavia no tiene un
+ * saldo confirmado/actualizado, para que "Confirmar calculado" siempre
+ * avance a la semana que falta en vez de quedar pegado en la primera semana
+ * visible una vez que esa ya se confirmo (lo que mostraria el saldo
+ * calculado viejo y, si se confirma de nuevo, sobreescribiria el saldo
+ * confirmado correcto con ese valor desactualizado).
+ */
 export function suggestedOpeningBalanceWeek(result: CashFlowResult, weeks: Array<{ days: CashFlowDay[] }>) {
-  const firstFullWeek = weeks.find((week) => week.days[0]?.date.getDay() === 1);
-  const week = firstFullWeek ?? weeks[0];
+  const fullWeeks = weeks.filter((week) => week.days[0]?.date.getDay() === 1);
+  const isConfirmed = (week: { days: CashFlowDay[] }) => {
+    const firstDay = week.days[0];
+    return firstDay ? result.confirmedBalances.has(dateKey(firstDay.date)) : false;
+  };
 
-  if (!week) {
+  const nextUnconfirmedFullWeek = fullWeeks.find((week) => !isConfirmed(week));
+  const week = nextUnconfirmedFullWeek ?? fullWeeks.at(-1) ?? weeks[0];
+
+  if (!week?.days[0]) {
     return null;
   }
 

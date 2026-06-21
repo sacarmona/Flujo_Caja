@@ -65,4 +65,44 @@ describe("opening balance helpers", () => {
     expect(weekOpeningBalance(result, [days[1], days[2]]).toFixed(0)).toBe("-399000");
     expect(suggestedOpeningBalanceWeek(result, [{ days: [days[0]] }, { days: [days[1], days[2]] }])?.amount.toFixed(0)).toBe("-399000");
   });
+
+  it("sugiere la siguiente semana sin confirmar, no la primera, una vez que esa ya se confirmo", () => {
+    // Semana 26 (22-jun, lunes) ya confirmada en 619181; semana 27 (29-jun, lunes) todavia no.
+    const days = [
+      day(new Date(2026, 5, 19), -399000, -399000), // viernes, semana 25 (sin lunes visible)
+      day(new Date(2026, 5, 22), 0, 619181), // lunes semana 26: el loop de calculateCashFlowByBusinessDay ya aplico el confirmado aqui
+      day(new Date(2026, 5, 26), 100000, 719181), // viernes semana 26
+      day(new Date(2026, 5, 29), 0, 719181) // lunes semana 27, aun sin confirmar
+    ];
+    const result: CashFlowResult = {
+      openingBalance: new Prisma.Decimal(1046293),
+      days,
+      weeks: [],
+      confirmedBalances: new Map([["2026-06-22", new Prisma.Decimal(619181)]])
+    };
+    const weeks = [{ days: [days[0]] }, { days: [days[1], days[2]] }, { days: [days[3]] }];
+
+    const suggested = suggestedOpeningBalanceWeek(result, weeks);
+
+    expect(suggested?.date.getTime()).toBe(days[3].date.getTime());
+    expect(suggested?.amount.toFixed(0)).toBe("719181");
+  });
+
+  it("si todas las semanas visibles ya estan confirmadas, sugiere la ultima en vez de volver a la primera", () => {
+    const days = [day(new Date(2026, 5, 22), 0, 619181), day(new Date(2026, 5, 29), 0, 800000)];
+    const result: CashFlowResult = {
+      openingBalance: new Prisma.Decimal(0),
+      days,
+      weeks: [],
+      confirmedBalances: new Map([
+        ["2026-06-22", new Prisma.Decimal(619181)],
+        ["2026-06-29", new Prisma.Decimal(800000)]
+      ])
+    };
+    const weeks = [{ days: [days[0]] }, { days: [days[1]] }];
+
+    const suggested = suggestedOpeningBalanceWeek(result, weeks);
+
+    expect(suggested?.date.getTime()).toBe(days[1].date.getTime());
+  });
 });
