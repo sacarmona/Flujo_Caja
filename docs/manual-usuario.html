@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+<meta charset="UTF-8" />
+<title>Manual de Usuario - Flujo de Caja ADENTU</title>
+<style>
+  @page { size: A4; margin: 22mm 18mm 20mm 18mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: #1f2933;
+    font-size: 10.5pt;
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4 { color: #0f5f8f; font-weight: 700; }
+  h1 { font-size: 20pt; margin: 0 0 4mm; }
+  h2 { font-size: 15pt; margin: 0 0 4mm; border-bottom: 2px solid #0f5f8f; padding-bottom: 2mm; }
+  h3 { font-size: 12pt; margin: 6mm 0 2mm; color: #0f766e; }
+  h4 { font-size: 10.5pt; margin: 4mm 0 1mm; color: #1f2933; }
+  p { margin: 0 0 3mm; }
+  ul, ol { margin: 0 0 3mm; padding-left: 5mm; }
+  li { margin-bottom: 1.2mm; }
+  .section { page-break-before: always; }
+  .cover { page-break-after: always; text-align: center; padding-top: 55mm; }
+  .cover img { width: 34mm; }
+  .cover h1 { font-size: 26pt; margin-top: 8mm; }
+  .cover .subtitle { font-size: 13pt; color: #0f766e; margin-top: 2mm; }
+  .cover .meta { margin-top: 30mm; font-size: 10pt; color: #52606d; }
+  table { width: 100%; border-collapse: collapse; margin: 3mm 0 5mm; font-size: 9.3pt; }
+  th, td { border: 1px solid #cbd2d9; padding: 1.6mm 2.4mm; text-align: left; vertical-align: top; }
+  th { background: #eef5f7; color: #0f5f8f; }
+  tr:nth-child(even) td { background: #f8fafb; }
+  .ok { color: #0f766e; font-weight: 700; text-align: center; }
+  .no { color: #b7791f; font-weight: 700; text-align: center; }
+  .box {
+    border-left: 4px solid #0f5f8f;
+    background: #eef5f7;
+    padding: 3mm 4mm;
+    margin: 3mm 0 5mm;
+    border-radius: 2px;
+  }
+  .box.warn { border-left-color: #b7791f; background: #fbf3e6; }
+  .box h4 { margin-top: 0; }
+  .role-tag {
+    display: inline-block;
+    background: #0f5f8f;
+    color: white;
+    border-radius: 3px;
+    padding: 0.5mm 2mm;
+    font-size: 8.5pt;
+    margin: 0 1mm 1mm 0;
+  }
+  .role-tag.finance { background: #0f766e; }
+  .role-tag.entry { background: #b7791f; }
+  .role-tag.readonly { background: #52606d; }
+  .toc-item { display: flex; justify-content: space-between; border-bottom: 1px dotted #cbd2d9; padding: 1.5mm 0; font-size: 11pt; }
+  code { background: #eef5f7; padding: 0.3mm 1.2mm; border-radius: 2px; font-size: 9pt; }
+  .footer-note { font-size: 8.5pt; color: #7b8794; margin-top: 8mm; }
+</style>
+</head>
+<body>
+
+<!-- ===================== PORTADA ===================== -->
+<div class="cover">
+  <img src="data:image/png;base64,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" alt="ADENTU" />
+  <h1>Manual de Usuario</h1>
+  <div class="subtitle">Sistema de Flujo de Caja &middot; ADENTU Ingenier&iacute;a SpA</div>
+  <div class="meta">
+    Versi&oacute;n 1.0 &middot; Junio 2026<br />
+    Aplica a los roles: Administrador, Finanzas, Ingreso de movimientos y Solo lectura
+  </div>
+</div>
+
+<!-- ===================== INDICE ===================== -->
+<div class="section">
+<h2>&Iacute;ndice</h2>
+<div class="toc-item"><span>1. Introducci&oacute;n y roles de usuario</span></div>
+<div class="toc-item"><span>2. Iniciar sesi&oacute;n</span></div>
+<div class="toc-item"><span>3. Vista Recurrentes</span></div>
+<div class="toc-item"><span>4. Vista Calendario</span></div>
+<div class="toc-item"><span>5. Vista Movimientos</span></div>
+<div class="toc-item"><span>6. Vista Conciliaci&oacute;n</span></div>
+<div class="toc-item"><span>7. Vista Bit&aacute;cora</span></div>
+<div class="toc-item"><span>8. Vista Configuraci&oacute;n</span></div>
+<div class="toc-item"><span>9. Recomendaciones por tipo de usuario</span></div>
+<div class="toc-item"><span>10. Errores frecuentes y c&oacute;mo resolverlos</span></div>
+</div>
+
+<!-- ===================== 1. INTRODUCCION ===================== -->
+<div class="section">
+<h2>1. Introducci&oacute;n y roles de usuario</h2>
+
+<p>Flujo de Caja es la herramienta interna de ADENTU Ingenier&iacute;a SpA para proyectar, registrar y controlar los
+ingresos y egresos de la cuenta corriente Santander de la empresa. Permite anticipar el saldo disponible
+semana a semana, automatizar movimientos que se repiten (sueldos, arriendos, servicios) y mantener un
+respaldo auditable de cada cambio.</p>
+
+<p>La aplicaci&oacute;n se organiza en seis vistas, accesibles desde el men&uacute; lateral: <b>Recurrentes</b>,
+<b>Calendario</b>, <b>Movimientos</b>, <b>Conciliaci&oacute;n</b>, <b>Bit&aacute;cora</b> y <b>Configuraci&oacute;n</b>.</p>
+
+<h3>Roles disponibles</h3>
+<p>Cada usuario tiene asignado uno de cuatro roles. El rol determina qu&eacute; puede ver y qu&eacute; puede modificar
+en cada vista. Un Administrador asigna y cambia el rol de cada usuario desde Configuraci&oacute;n &rarr; Usuarios.</p>
+
+<table>
+<tr><th>Rol</th><th>Para qui&eacute;n es</th><th>Qu&eacute; puede hacer, en resumen</th></tr>
+<tr>
+  <td><span class="role-tag">Administrador</span></td>
+  <td>Responsable de finanzas o gerencia que administra el sistema</td>
+  <td>Acceso total: crea y edita movimientos, recurrencias, saldos, usuarios y el plan de cuentas.</td>
+</tr>
+<tr>
+  <td><span class="role-tag finance">Finanzas</span></td>
+  <td>Equipo de finanzas / tesorer&iacute;a</td>
+  <td>Igual que Administrador, salvo que no puede gestionar usuarios ni el plan de cuentas.</td>
+</tr>
+<tr>
+  <td><span class="role-tag entry">Ingreso de movimientos</span></td>
+  <td>Persona que registra ingresos y egresos d&iacute;a a d&iacute;a</td>
+  <td>Crea, edita y registra pagos de movimientos. No administra recurrencias, saldos iniciales ni usuarios.</td>
+</tr>
+<tr>
+  <td><span class="role-tag readonly">Solo lectura</span></td>
+  <td>Gerencia, auditor&iacute;a o cualquier persona que solo necesita visibilidad</td>
+  <td>Puede ver todas las vistas (Calendario, Movimientos, Bit&aacute;cora, Configuraci&oacute;n), pero no puede crear
+  ni editar nada.</td>
+</tr>
+</table>
+
+<div class="box">
+<h4>Matriz de permisos completa</h4>
+<table>
+<tr><th>Acci&oacute;n</th><th>Admin</th><th>Finanzas</th><th>Ingreso mov.</th><th>Solo lectura</th></tr>
+<tr><td>Ver Calendario, Movimientos, Bit&aacute;cora, Configuraci&oacute;n (empresa y plan de cuentas)</td><td class="ok">S&iacute;</td><td class="ok">S&iacute;</td><td class="ok">S&iacute;</td><td class="ok">S&iacute;</td></tr>
+<tr><td>Ver y usar Recurrentes</td><td class="ok">S&iacute;</td><td class="ok">S&iacute;</td><td class="no">No</td><td class="no">No</td></tr>
+<tr><td>Crear, editar y cancelar Movimientos; registrar pagos</td><td class="ok">S&iacute;</td><td class="ok">S&iacute;</td><td class="ok">S&iacute;</td><td class="no">No</td></tr>
+<tr><td>Actualizar / confirmar Saldo inicial en Calendario</td><td class="ok">S&iacute;</td><td class="ok">S&iacute;</td><td class="no">No</td><td class="no">No</td></tr>
+<tr><td>Crear / editar usuarios y permisos</td><td class="ok">S&iacute;</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+<tr><td>Crear / editar el Plan de cuentas</td><td class="ok">S&iacute;</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+</table>
+</div>
+
+<p class="footer-note">Si una acci&oacute;n no aparece disponible en pantalla (bot&oacute;n ausente o secci&oacute;n con mensaje
+de "solo lectura"), generalmente es porque el rol actual no tiene permiso, no porque exista un error.</p>
+</div>
+
+<!-- ===================== 2. LOGIN ===================== -->
+<div class="section">
+<h2>2. Iniciar sesi&oacute;n</h2>
+<p>Ingresa con tu correo y contrase&ntilde;a en la pantalla de inicio. Todos los roles inician sesi&oacute;n de la misma
+forma; lo que cambia despu&eacute;s es lo que cada uno puede hacer dentro de la app.</p>
+<ul>
+<li>Si el correo o la contrase&ntilde;a son incorrectos, se muestra el mensaje <i>"Correo o contrase&ntilde;a incorrectos."</i></li>
+<li>Esta versi&oacute;n no incluye recuperaci&oacute;n de contrase&ntilde;a autoservicio: si la olvidas, pide a un
+Administrador que te asigne una nueva desde Configuraci&oacute;n &rarr; Usuarios &rarr; Editar.</li>
+<li>Para salir, usa el bot&oacute;n <b>Salir</b> en la esquina superior derecha, visible en cualquier vista.</li>
+</ul>
+</div>
+
+<!-- ===================== 3. RECURRENTES ===================== -->
+<div class="section">
+<h2>3. Vista Recurrentes</h2>
+<p><span class="role-tag">Administrador</span><span class="role-tag finance">Finanzas</span> &mdash; &Uacute;nicos roles con acceso a esta vista.</p>
+
+<h3>Para qu&eacute; sirve</h3>
+<p>Aqu&iacute; se definen las reglas que generan autom&aacute;ticamente movimientos proyectados que se repiten en el
+tiempo: sueldos mensuales, arriendos, servicios peri&oacute;dicos, etc. En vez de crear cada movimiento a mano
+mes a mes, se crea la regla una sola vez y el sistema la proyecta hacia adelante.</p>
+
+<h3>Crear una recurrencia</h3>
+<p>Abre el formulario "Crear recurrencia" (colapsado por defecto) y completa:</p>
+<ul>
+<li><b>Tipo</b> (Ingreso/Egreso), <b>cuenta contable</b> (se filtra seg&uacute;n el tipo elegido), <b>descripci&oacute;n</b> y <b>monto</b>.</li>
+<li><b>Moneda</b>: si eliges una distinta de CLP, puedes indicar una <b>tasa manual</b> y su motivo, como respaldo
+si la tasa autom&aacute;tica (mindicador.cl) no estuviera disponible ese d&iacute;a.</li>
+<li><b>Cuenta bancaria</b>, <b>unidad de negocio</b>, y opcionalmente <b>proyecto</b> y <b>centro de costo</b>.</li>
+<li><b>Frecuencia</b>: diaria, d&iacute;as h&aacute;biles, cada N d&iacute;as, semanal, quincenal, mensual, trimestral,
+semestral o anual. Seg&uacute;n la frecuencia elegida se habilita el campo correspondiente (intervalo en d&iacute;as,
+d&iacute;a del mes, o d&iacute;a de la semana).</li>
+<li><b>Inicio</b> (obligatorio) y <b>t&eacute;rmino</b> (opcional; si se deja vac&iacute;o, la regla no tiene fecha de fin).</li>
+<li><b>Estado inicial</b> de cada movimiento generado (por defecto, Proyectado).</li>
+</ul>
+
+<div class="box">
+<h4>Recomendaci&oacute;n</h4>
+<p>Antes de guardar, revisa el bloque de <b>vista previa</b> que muestra las pr&oacute;ximas ocurrencias calculadas.
+Si una fecha cae en fin de semana o feriado, el sistema la mueve autom&aacute;ticamente al d&iacute;a h&aacute;bil m&aacute;s
+cercano e indica "(movida desde DD/MM/AAAA)" &mdash; esto es normal y evita movimientos en d&iacute;as no h&aacute;biles.</p>
+</div>
+
+<h3>Editar y generar movimientos</h3>
+<p>Cada regla del listado tiene un detalle "Editar" colapsable con los mismos campos. Desde ah&iacute; tambi&eacute;n
+se puede <b>generar 12 meses de movimientos</b> hacia adelante para que aparezcan en la vista Movimientos.</p>
+
+<h3>Desactivar una recurrencia</h3>
+<div class="box warn">
+<h4>Acci&oacute;n irreversible sobre movimientos pendientes</h4>
+<p>Al desactivar una regla activa, el sistema elimina automáticamente (de forma l&oacute;gica, no f&iacute;sica) todos
+los movimientos <b>no pagados</b> que esa regla hab&iacute;a generado a futuro. Por eso se exige marcar la casilla
+de confirmaci&oacute;n antes de continuar. Los movimientos ya pagados o cobrados no se ven afectados.</p>
+</div>
+
+<h3>Importar recurrencias desde una planilla</h3>
+<p>El bot&oacute;n de importaci&oacute;n permite cargar varias reglas a la vez desde un archivo CSV o XLSX, en dos pasos:</p>
+<ol>
+<li><b>Previsualizar</b>: sube el archivo. El sistema valida cada fila y marca cada una como "Lista" o "Con errores",
+mostrando el detalle del problema.</li>
+<li><b>Confirmar importaci&oacute;n</b>: crea de una vez todas las filas que pasaron la validaci&oacute;n; las filas con
+error no se crean y quedan reportadas para corregirlas y reintentar.</li>
+</ol>
+<p>Puedes descargar la plantilla de ejemplo desde el mismo formulario para asegurar el formato correcto de columnas.</p>
+</div>
+
+<!-- ===================== 4. CALENDARIO ===================== -->
+<div class="section">
+<h2>4. Vista Calendario</h2>
+<p><span class="role-tag">Administrador</span><span class="role-tag finance">Finanzas</span><span class="role-tag entry">Ingreso mov.</span><span class="role-tag readonly">Solo lectura</span> &mdash; Todos los roles pueden ver esta vista; solo Administrador y Finanzas pueden actualizar el saldo inicial.</p>
+
+<h3>Para qu&eacute; sirve</h3>
+<p>Es la vista ejecutiva del flujo de caja: una matriz con los d&iacute;as h&aacute;biles en columnas y las cuentas
+contables en filas, mostrando para cada d&iacute;a el monto proyectado (o real) y el saldo acumulado resultante.
+Es la mejor vista para responder "&iquest;cu&aacute;nta plata tendremos disponible la pr&oacute;xima semana?".</p>
+
+<h3>Filtros disponibles</h3>
+<ul>
+<li><b>Horizonte</b>: 3, 6, 9 o 12 meses hacia adelante.</li>
+<li><b>Modo</b>: Proyectado (todo lo planificado), Real (solo lo efectivamente ocurrido) o Comparaci&oacute;n (ambos).</li>
+<li><b>Unidad de negocio</b>, <b>cuenta contable</b>, <b>estado</b>, <b>tipo</b> y <b>moneda</b>.</li>
+</ul>
+
+<h3>C&oacute;mo leer la tabla</h3>
+<ul>
+<li>La columna "Concepto" agrupa las cuentas contables en categor&iacute;as; haz clic en el <code>+</code>/<code>-</code>
+junto a una categor&iacute;a para colapsarla y ver menos detalle.</li>
+<li>Haz clic en cualquier celda de monto para abrir el listado de Movimientos filtrado exactamente por esa
+fecha y esa cuenta &mdash; es la forma m&aacute;s r&aacute;pida de investigar un n&uacute;mero que llama la atenci&oacute;n.</li>
+<li>Los iconos peque&ntilde;os indican ingresos, egresos, saldo en alerta (negativo) o si el saldo de ese d&iacute;a ya
+qued&oacute; confirmado.</li>
+</ul>
+
+<h3>Saldo inicial Santander</h3>
+<p>El encabezado muestra el saldo desde el cual parte toda la proyecci&oacute;n. El sistema sugiere autom&aacute;ticamente
+la siguiente semana que a&uacute;n no tiene un saldo confirmado, junto con el monto que calcul&oacute; para ella.</p>
+<div class="box">
+<h4>Recomendaci&oacute;n de uso (solo Administrador / Finanzas)</h4>
+<ul>
+<li>Cuando concilies el saldo real del banco para una semana, usa <b>"Confirmar calculado"</b> si coincide con
+lo que el sistema proyect&oacute;, o ingresa el monto real en el campo <b>"Nuevo saldo"</b> con su fecha y presiona
+<b>Actualizar</b> si difiere.</li>
+<li>Confirmar el saldo de una semana hace que todos los d&iacute;as desde esa fecha en adelante recalculen su saldo
+acumulado a partir del nuevo valor &mdash; hazlo regularmente (al menos una vez por semana) para que la
+proyecci&oacute;n no se desv&iacute;e del saldo real del banco.</li>
+<li>Si necesitas revertir una confirmaci&oacute;n hecha por error, usa "Quitar saldo confirmado" en esa semana.</li>
+</ul>
+</div>
+<p>Esta vista requiere que exista una cuenta bancaria llamada "Cuenta Corriente Santander" en el sistema; si no
+existe, el saldo no se puede calcular y se muestra un aviso.</p>
+</div>
+
+<!-- ===================== 5. MOVIMIENTOS ===================== -->
+<div class="section">
+<h2>5. Vista Movimientos</h2>
+<p><span class="role-tag">Administrador</span><span class="role-tag finance">Finanzas</span><span class="role-tag entry">Ingreso mov.</span> pueden crear y editar.
+<span class="role-tag readonly">Solo lectura</span> solo puede revisar.</p>
+
+<h3>Para qu&eacute; sirve</h3>
+<p>Es el registro detallado de cada ingreso y egreso: la entrada principal de datos del flujo de caja, ya sea
+generado manualmente o por una recurrencia.</p>
+
+<h3>Listado</h3>
+<p>Los movimientos se agrupan por semana. Cada semana se puede contraer o expandir individualmente, o usar los
+botones <b>"Expandir todo"</b> / <b>"Contraer todo"</b> sobre la tabla para listados largos. El encabezado de cada
+semana muestra el saldo acumulado a esa fecha (mismo c&aacute;lculo que en Calendario).</p>
+<p>Se puede filtrar por rango de <b>fechas</b>, <b>tipo</b>, <b>estado</b>, <b>cuenta</b> y <b>unidad de negocio</b>.</p>
+
+<h3>Edici&oacute;n r&aacute;pida desde el listado</h3>
+<p>Directamente en la tabla, sin abrir el detalle, se puede editar la <b>fecha</b>, el <b>monto</b> y el <b>estado</b>
+de un movimiento (excepto pasarlo a "Cancelado", que requiere el detalle). Los cambios se guardan al salir del
+campo (perder el foco).</p>
+
+<h3>Crear un movimiento</h3>
+<p>Formulario colapsable "Crear movimiento", con los mismos campos que una recurrencia individual: tipo, cuenta
+contable, descripci&oacute;n, monto, moneda (con tasa manual opcional si no es CLP), cuenta bancaria, unidad de
+negocio, proyecto y centro de costo opcionales, fecha proyectada, fecha real opcional, estado inicial y notas.</p>
+
+<h3>Detalle de un movimiento (bot&oacute;n "Ver")</h3>
+<p>Muestra toda la informaci&oacute;n del movimiento, su tasa de cambio aplicada (autom&aacute;tica o manual con motivo),
+y dos secciones adicionales:</p>
+
+<h4>Pagos / cobros</h4>
+<ul>
+<li>Resumen con total pagado, saldo pendiente y cantidad de pagos activos.</li>
+<li>Se puede <b>registrar un pago o cobro</b> (monto, fecha y referencia opcional) mientras quede saldo
+pendiente. <b>Los pagos solo se habilitan para movimientos en CLP.</b></li>
+<li>El estado del movimiento se recalcula solo seg&uacute;n los pagos registrados (pasa a "Parcial" o
+"Pagado/Cobrado" autom&aacute;ticamente).</li>
+<li>Cualquier pago se puede <b>anular</b> (no se borra, queda marcado como anulado para mantener el respaldo).</li>
+</ul>
+
+<h4>Editar o cancelar el movimiento</h4>
+<ul>
+<li>El formulario de edici&oacute;n completo solo est&aacute; disponible mientras el movimiento no est&eacute; "Cancelado".</li>
+<li><b>"Cancelar sin borrar"</b> marca el movimiento como cancelado (con fecha y motivo) sin eliminarlo, para
+mantener el historial.</li>
+<li>Desde el listado tambi&eacute;n se puede <b>borrar</b> un movimiento directamente, pero solo si no tiene pagos
+registrados, no tiene conciliaciones asociadas y no est&aacute; ya pagado/cobrado.</li>
+</ul>
+
+<div class="box">
+<h4>Recomendaci&oacute;n</h4>
+<p>Prefiere "Cancelar sin borrar" frente a "Borrar" salvo que el movimiento se haya creado por error real (ej.
+duplicado, datos de prueba). Cancelar preserva la trazabilidad en la Bit&aacute;cora; borrar es para limpieza de
+errores de carga, no para anular operaciones que s&iacute; sucedieron pero no se concretar&aacute;n.</p>
+</div>
+</div>
+
+<!-- ===================== 6. CONCILIACION ===================== -->
+<div class="section">
+<h2>6. Vista Conciliaci&oacute;n</h2>
+<p>Disponible para todos los roles que pueden iniciar sesi&oacute;n.</p>
+<p>Esta vista est&aacute; reservada para un m&oacute;dulo futuro, pensado para comparar los movimientos registrados en el
+sistema contra la cartola bancaria u otra fuente externa, y detectar diferencias. Actualmente no tiene
+funcionalidad activa; cuando se habilite, este manual se actualizar&aacute; con sus instrucciones.</p>
+</div>
+
+<!-- ===================== 7. BITACORA ===================== -->
+<div class="section">
+<h2>7. Vista Bit&aacute;cora</h2>
+<p>Disponible para todos los roles (solo lectura para todos, no tiene acciones).</p>
+
+<h3>Para qu&eacute; sirve</h3>
+<p>Es el historial de auditor&iacute;a: registra qui&eacute;n hizo qu&eacute; cambio y cu&aacute;ndo, sobre cada movimiento
+(creaci&oacute;n, edici&oacute;n, cancelaci&oacute;n o eliminaci&oacute;n). &Uacute;til para resolver dudas como "&iquest;qui&eacute;n cambi&oacute;
+este monto y cu&aacute;ndo?".</p>
+
+<h3>C&oacute;mo usarla</h3>
+<ul>
+<li>Filtra por <b>tipo de acci&oacute;n</b> (Creaci&oacute;n, Edici&oacute;n, Eliminaci&oacute;n, Cancelaci&oacute;n) y por <b>rango de
+fechas</b>.</li>
+<li>Cada fila muestra fecha y hora, el usuario responsable (o "Sistema" si fue autom&aacute;tico, por ejemplo una
+recurrencia generando un movimiento), la acci&oacute;n, el movimiento afectado y su monto.</li>
+<li>Los registros se muestran del m&aacute;s reciente al m&aacute;s antiguo, con paginaci&oacute;n simple (Anterior/Siguiente).</li>
+</ul>
+</div>
+
+<!-- ===================== 8. CONFIGURACION ===================== -->
+<div class="section">
+<h2>8. Vista Configuraci&oacute;n</h2>
+
+<h3>8.1 Datos de la empresa</h3>
+<p>Disponible para todos los roles, de solo lectura. Muestra los par&aacute;metros base de la &uacute;nica empresa del
+sistema: nombre, formato regional, zona horaria y moneda base. No son editables desde la interfaz.</p>
+
+<h3>8.2 Usuarios</h3>
+<p><span class="role-tag">Administrador</span> &mdash; &Uacute;nico rol con acceso a esta secci&oacute;n.</p>
+
+<h4>Crear un usuario</h4>
+<p>Completa nombre (opcional), correo, rol y una contrase&ntilde;a inicial de al menos 8 caracteres, y presiona
+"Crear usuario". El correo debe ser &uacute;nico en el sistema.</p>
+
+<h4>Editar un usuario</h4>
+<p>Cada usuario del listado tiene un detalle "Editar" colapsable donde se puede cambiar su nombre, correo,
+<b>rol / permisos</b>, y opcionalmente asignar una <b>nueva contrase&ntilde;a</b> (si se deja en blanco, la
+contrase&ntilde;a actual no cambia).</p>
+
+<div class="box warn">
+<h4>Protecci&oacute;n contra bloqueo de la cuenta</h4>
+<p>Un Administrador <b>no puede cambiar su propio rol</b> desde este formulario (el selector aparece
+deshabilitado en su propia fila). Esto evita que, por error, una cuenta de Administrador se quite a s&iacute; misma
+el &uacute;nico rol capaz de revertir ese cambio. Si necesitas cambiar el rol de tu propia cuenta, otro
+Administrador debe hacerlo por ti.</p>
+</div>
+
+<h3>8.3 Plan de cuentas</h3>
+<p><span class="role-tag">Administrador</span> &mdash; &Uacute;nico rol que puede crear o editar cuentas. El resto de los
+roles puede verlo en modo solo lectura.</p>
+
+<p>El plan de cuentas es la estructura jer&aacute;rquica (categor&iacute;a &rarr; subcuenta) que clasifica todos los
+movimientos: Ingresos, Costos directos, Gastos administrativos, Impuestos, Financiamiento, Inversiones y
+Movimientos no operacionales.</p>
+
+<h4>Reglas a tener en cuenta</h4>
+<ul>
+<li>Solo las cuentas <b>sin subcuentas</b> pueden recibir movimientos directamente; en cuanto una cuenta tiene
+hijos, el sistema le quita autom&aacute;ticamente el permiso de "Permite movimientos".</li>
+<li>El campo <b>Orden</b> controla en qu&eacute; posici&oacute;n aparece la cuenta dentro de su categor&iacute;a en
+Calendario y en los formularios de selecci&oacute;n.</li>
+<li>Una cuenta marcada como <b>"Usada"</b> ya tiene movimientos asociados; desactivarla no borra esos
+movimientos, pero impide usarla en nuevos registros.</li>
+</ul>
+<div class="box">
+<h4>Recomendaci&oacute;n</h4>
+<p>Evita reorganizar el plan de cuentas con frecuencia una vez que ya hay movimientos cargados: cambiar el tipo
+o la jerarqu&iacute;a de una cuenta usada afecta c&oacute;mo se ve&iacute;a hist&oacute;ricamente el flujo de caja en Calendario.
+Prefiere crear una cuenta nueva y desactivar la antigua si necesitas reclasificar algo de forma permanente.</p>
+</div>
+</div>
+
+<!-- ===================== 9. RECOMENDACIONES POR ROL ===================== -->
+<div class="section">
+<h2>9. Recomendaciones por tipo de usuario</h2>
+
+<h3><span class="role-tag">Administrador</span></h3>
+<ul>
+<li>Revisa peri&oacute;dicamente Configuraci&oacute;n &rarr; Usuarios para confirmar que cada persona activa tenga el
+rol m&iacute;nimo necesario para su trabajo (principio de menor privilegio).</li>
+<li>Mant&eacute;n el plan de cuentas estable; los cambios estructurales conviene planificarlos junto con Finanzas
+antes de aplicarlos.</li>
+<li>Confirma el saldo inicial en Calendario con la misma frecuencia que Finanzas, o delega esa tarea
+expl&iacute;citamente para evitar que quede sin actualizar.</li>
+</ul>
+
+<h3><span class="role-tag finance">Finanzas</span></h3>
+<ul>
+<li>Tu tarea recurrente m&aacute;s importante es <b>confirmar el saldo inicial</b> en Calendario apenas tengas el
+saldo real del banco de la semana, para que la proyecci&oacute;n del resto del a&ntilde;o se mantenga confiable.</li>
+<li>Usa Recurrentes para todo gasto o ingreso predecible (sueldos, arriendos, servicios) en vez de crearlo
+manualmente cada periodo; reduce errores de digitaci&oacute;n y olvidos.</li>
+<li>Antes de desactivar una recurrencia, revisa en Movimientos cu&aacute;ntos movimientos futuros no pagados
+generar&iacute;a eliminar, especialmente si la regla lleva mucho tiempo activa.</li>
+</ul>
+
+<h3><span class="role-tag entry">Ingreso de movimientos</span></h3>
+<ul>
+<li>Registra los movimientos con la <b>fecha proyectada real</b> de pago/cobro esperado, no la fecha en que
+los est&aacute;s digitando; eso es lo que alimenta el Calendario.</li>
+<li>Cuando recibas un pago o cobro real, reg&iacute;stralo en el detalle del movimiento en vez de editar el monto
+original &mdash; as&iacute; queda el historial de cu&aacute;nto se proyect&oacute; versus cu&aacute;nto se cobr&oacute; efectivamente.</li>
+<li>Si necesitas anular un movimiento que ya no proceder&aacute;, prefiere "Cancelar sin borrar" para dejar
+registro, salvo que sea claramente un error de carga.</li>
+</ul>
+
+<h3><span class="role-tag readonly">Solo lectura</span></h3>
+<ul>
+<li>Usa Calendario como vista principal para una mirada ejecutiva r&aacute;pida del flujo proyectado.</li>
+<li>Si necesitas el detalle de un n&uacute;mero espec&iacute;fico, haz clic directamente sobre la celda en Calendario
+para llegar al listado de Movimientos ya filtrado, en vez de buscar manualmente.</li>
+<li>Bit&aacute;cora es la mejor herramienta si necesitas verificar qui&eacute;n hizo un cambio espec&iacute;fico.</li>
+</ul>
+</div>
+
+<!-- ===================== 10. ERRORES FRECUENTES ===================== -->
+<div class="section">
+<h2>10. Errores frecuentes y c&oacute;mo resolverlos</h2>
+<table>
+<tr><th>Mensaje</th><th>Causa habitual</th><th>Qu&eacute; hacer</th></tr>
+<tr>
+  <td>"La cuenta contable no permite movimientos"</td>
+  <td>La cuenta elegida es una categor&iacute;a (tiene subcuentas) o fue desactivada</td>
+  <td>Elige una subcuenta espec&iacute;fica del plan de cuentas</td>
+</tr>
+<tr>
+  <td>"La cuenta bancaria no esta activa"</td>
+  <td>El banco asociado fue desactivado en el sistema</td>
+  <td>Selecciona otra cuenta bancaria activa o pide a un Administrador que la reactive</td>
+</tr>
+<tr>
+  <td>"El monto bruto debe ser positivo"</td>
+  <td>Se dej&oacute; el campo monto en cero o con un valor inv&aacute;lido</td>
+  <td>Ingresa un monto mayor a cero</td>
+</tr>
+<tr>
+  <td>"No existe Cuenta Corriente Santander"</td>
+  <td>No hay una cuenta bancaria con ese nombre exacto configurada</td>
+  <td>Pide a un Administrador que verifique el nombre de la cuenta bancaria</td>
+</tr>
+<tr>
+  <td>"Ya existe un usuario con ese correo"</td>
+  <td>Se intent&oacute; crear o editar un usuario con un correo ya registrado</td>
+  <td>Usa otro correo o edita el usuario existente en vez de crear uno nuevo</td>
+</tr>
+<tr>
+  <td>"No puedes quitarte el rol de Administrador a ti mismo"</td>
+  <td>Un Administrador intent&oacute; cambiar su propio rol desde su propia edici&oacute;n</td>
+  <td>Pide a otro Administrador que haga el cambio, o no es necesario si solo quer&iacute;as editar otro dato</td>
+</tr>
+<tr>
+  <td>"Correo o contrase&ntilde;a incorrectos"</td>
+  <td>Credenciales mal escritas, o la cuenta a&uacute;n no existe</td>
+  <td>Verifica may&uacute;sculas/min&uacute;sculas y espacios; si persiste, pide a un Administrador que confirme tu
+  correo o restablezca tu contrase&ntilde;a</td>
+</tr>
+<tr>
+  <td>Los pagos no se pueden registrar</td>
+  <td>El movimiento est&aacute; en una moneda distinta de CLP, o ya est&aacute; cancelado, o no tiene saldo pendiente</td>
+  <td>Verifica la moneda y el estado del movimiento; los pagos solo se habilitan en CLP con saldo pendiente</td>
+</tr>
+</table>
+
+<p class="footer-note">Manual generado a partir del estado de la aplicaci&oacute;n a junio de 2026. Ante cambios
+futuros de funcionalidad, este documento debe actualizarse junto con el c&oacute;digo.</p>
+</div>
+
+</body>
+</html>
