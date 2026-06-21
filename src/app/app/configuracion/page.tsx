@@ -90,11 +90,12 @@ function UserEditor({ user, currentUserId }: { user: { id: string; email: string
           </label>
           <label className="text-sm md:col-span-2">
             <span className="mb-1 block text-slate-600">Rol / permisos</span>
+            {isSelf ? <input name="role" type="hidden" value={user.role} /> : null}
             <select
               className="w-full rounded-md border border-slate-300 px-2 py-2 disabled:bg-slate-100 disabled:text-slate-400"
               defaultValue={user.role}
               disabled={isSelf}
-              name="role"
+              name={isSelf ? undefined : "role"}
             >
               <RoleOptions />
             </select>
