@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, History, Landmark, ListChecks, Repeat2, Settings, WalletCards } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, History, ListChecks, Repeat2, Settings, WalletCards } from "lucide-react";
 import { APP_COMPANY_NAME, ROLE_LABELS, type AppRole } from "@/lib/constants";
 
 const navigation = [
@@ -45,9 +46,7 @@ export function AppShell({ children, user }: AppShellProps) {
         }`}
       >
         <Link className="flex items-center gap-3" href="/app">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded bg-adentu-blue text-white">
-            <Landmark aria-hidden className="size-5" />
-          </span>
+          <Image alt="ADENTU" className="shrink-0" height={40} priority src="/brand-icon.png" width={40} />
           {collapsed ? null : (
             <span>
               <span className="block text-base font-semibold">ADENTU Cash Flow</span>
@@ -87,7 +86,7 @@ export function AppShell({ children, user }: AppShellProps) {
         <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur lg:px-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link className="flex items-center gap-2 font-semibold lg:hidden" href="/app">
-              <Landmark aria-hidden className="size-5 text-adentu-blue" />
+              <Image alt="ADENTU" height={24} src="/brand-icon.png" width={24} />
               ADENTU
             </Link>
             <nav className="flex gap-1 overflow-x-auto lg:hidden">
