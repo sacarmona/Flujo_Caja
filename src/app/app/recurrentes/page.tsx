@@ -259,24 +259,23 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
                 </div>
               </div>
 
-              <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <h4 className="text-sm font-semibold text-adentu-ink">Proximas 10 ocurrencias</h4>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {preview.map((item) => {
-                    const moved = dateKey(item.occurrenceDate) !== dateKey(item.projectedDate);
-                    return (
-                      <span className="rounded border border-slate-200 bg-white px-2 py-1 text-xs" key={dateKey(item.occurrenceDate)}>
-                        {formatDate(item.projectedDate)}
-                        {moved ? ` (movida desde ${formatDate(item.occurrenceDate)})` : ""}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-
               {canManage ? (
                 <details className="mt-4">
                   <summary className="cursor-pointer text-sm font-semibold text-adentu-blue">Editar regla</summary>
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <h4 className="text-sm font-semibold text-adentu-ink">Proximas 10 ocurrencias</h4>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {preview.map((item) => {
+                        const moved = dateKey(item.occurrenceDate) !== dateKey(item.projectedDate);
+                        return (
+                          <span className="rounded border border-slate-200 bg-white px-2 py-1 text-xs" key={dateKey(item.occurrenceDate)}>
+                            {formatDate(item.projectedDate)}
+                            {moved ? ` (movida desde ${formatDate(item.occurrenceDate)})` : ""}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
                   <div className="mt-3">
                     <RecurrenceForm
                       action={updateRecurrenceAction}
@@ -303,7 +302,22 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
                     </div>
                   </div>
                 </details>
-              ) : null}
+              ) : (
+                <details className="mt-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-adentu-blue">Proximas 10 ocurrencias</summary>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {preview.map((item) => {
+                      const moved = dateKey(item.occurrenceDate) !== dateKey(item.projectedDate);
+                      return (
+                        <span className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs" key={dateKey(item.occurrenceDate)}>
+                          {formatDate(item.projectedDate)}
+                          {moved ? ` (movida desde ${formatDate(item.occurrenceDate)})` : ""}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </details>
+              )}
             </article>
           );
         })}
