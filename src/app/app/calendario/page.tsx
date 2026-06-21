@@ -321,7 +321,7 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
         <span className="inline-flex items-center gap-1"><AlertTriangle className="size-3.5 text-red-700" /> Saldo negativo o alerta</span>
       </div>
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <div className="mt-6 max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white">
         <table className="border-collapse text-sm">
           <thead className="sticky top-0 z-20 bg-white shadow-sm">
             <tr>
