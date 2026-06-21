@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import type { MovementStatus, MovementType } from "@prisma/client";
 import { formatCurrency, todayInAppTimeZone } from "@/lib/format";
+import { weekOfYear } from "@/lib/iso-week";
 
 export const typeLabels: Record<MovementType, string> = {
   INCOME: "Ingreso",
@@ -49,57 +50,6 @@ export function todayInputValue(): string {
 
 export function formatAmount(amount: { toString(): string } | number, currency: string) {
   return currency === "CLP" ? formatCurrency(Number(amount)) : `${amount.toString()} ${currency}`;
-}
-
-/**
- * Numero de semana ISO 8601: semanas de lunes a domingo, y la Semana 1 de
- * cada año es la que contiene el primer jueves de ese año. Se usa UTC solo
- * para la aritmetica de dias (evita desfases por horario de verano), tomando
- * los componentes de fecha local (no es una conversion real de zona horaria).
- */
-function weekOfYear(date: Date): { year: number; week: number } {
-  const isoWeekday = ((date.getDay() + 6) % 7) + 1; // lunes=1 ... domingo=7
-  const thursdayUtc = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate() + (4 - isoWeekday));
-  const isoYear = new Date(thursdayUtc).getUTCFullYear();
-  const yearStartUtc = Date.UTC(isoYear, 0, 1);
-  const week = Math.ceil((Math.round((thursdayUtc - yearStartUtc) / 86400000) + 1) / 7);
-  return { year: isoYear, week };
-}
-
-/** Clave "año-semana" ISO 8601 de una fecha; usada para agrupar y para indexar el saldo acumulado por semana. */
-export function weekKeyOf(date: Date): string {
-  const { year, week } = weekOfYear(date);
-  return `${year}-${week}`;
-}
-
-export type BalanceMovement = {
-  type: MovementType;
-  status: MovementStatus;
-  projectedDate: Date;
-  projectedAmountClp: Prisma.Decimal | number | string;
-};
-
-/**
- * Saldo acumulado en CLP al cierre de cada semana, considerando TODOS los
- * movimientos que cumplen el filtro actual (no solo los de la pagina
- * visible), para que el acumulado sea correcto al cambiar de pagina. Ingresa
- * en positivo, egresa en negativo; los movimientos cancelados no suman.
- */
-export function balanceByWeekKey(movements: BalanceMovement[]): Map<string, Prisma.Decimal> {
-  const sorted = [...movements]
-    .filter((movement) => movement.status !== "CANCELLED")
-    .sort((a, b) => a.projectedDate.getTime() - b.projectedDate.getTime());
-
-  const balances = new Map<string, Prisma.Decimal>();
-  let cumulative = new Prisma.Decimal(0);
-
-  for (const movement of sorted) {
-    const signed = new Prisma.Decimal(movement.projectedAmountClp).mul(movement.type === "INCOME" ? 1 : -1);
-    cumulative = cumulative.plus(signed);
-    balances.set(weekKeyOf(movement.projectedDate), cumulative);
-  }
-
-  return balances;
 }
 
 /**

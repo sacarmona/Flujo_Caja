@@ -1,12 +1,17 @@
 import Link from "next/link";
 import { Fragment } from "react";
+import { Prisma } from "@prisma/client";
 import type { MovementStatus, MovementType } from "@prisma/client";
 import { createMovementAction, getMovementDefaults } from "@/app/app/movimientos/actions";
 import { MovementForm } from "@/app/app/movimientos/movement-form";
 import { QuickEditRow } from "@/app/app/movimientos/quick-edit-row";
-import { balanceByWeekKey, groupByWeek, movementInclude, statusLabels, typeLabels } from "@/app/app/movimientos/shared";
-import { formatCurrency } from "@/lib/format";
+import { groupByWeek, movementInclude, statusLabels, typeLabels } from "@/app/app/movimientos/shared";
+import { calculateSantanderCashFlow } from "@/lib/cash-flow-service";
+import { weeklyAccumulatedBalances } from "@/lib/calendar-view";
+import { formatCurrency, todayInAppTimeZone } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
+import { getHolidayKeys } from "@/lib/holidays-cl";
+import { weekKeyOf } from "@/lib/iso-week";
 import { canModifyMovements, movementStatuses, movementTypes } from "@/lib/movements";
 import { prisma } from "@/lib/prisma";
 
@@ -111,16 +116,48 @@ async function getMovements(companyId: string, filters: SearchParams) {
 }
 
 /**
- * Saldo acumulado por semana considerando TODOS los movimientos que cumplen
- * el filtro actual (no solo los de la pagina visible), para que sea correcto
- * al cambiar de pagina. Solo trae los campos minimos necesarios.
+ * Saldo acumulado por semana, calculado con el mismo motor que Vista
+ * Calendario (saldo inicial + saldos confirmados + flujo por dia habil),
+ * para que sea el mismo numero en ambas vistas. Cubre desde la fecha mas
+ * antigua hasta la mas reciente entre los movimientos filtrados (y siempre
+ * incluye "hoy", igual que Calendario). Si no existe la Cuenta Corriente
+ * Santander (requisito del motor de Calendario), no se muestra el saldo en
+ * vez de romper el listado completo.
  */
 async function getWeeklyBalances(companyId: string, filters: SearchParams) {
-  const movements = await prisma.movement.findMany({
-    where: movementsWhere(companyId, filters),
-    select: { type: true, status: true, projectedDate: true, projectedAmountClp: true }
-  });
-  return balanceByWeekKey(movements);
+  try {
+    const where = movementsWhere(companyId, filters);
+    const range = await prisma.movement.aggregate({
+      where,
+      _min: { projectedDate: true },
+      _max: { projectedDate: true }
+    });
+
+    const today = todayInAppTimeZone();
+    const earliest = range._min.projectedDate;
+    const latest = range._max.projectedDate;
+    const startDate = earliest && earliest < today ? earliest : today;
+    const endDate = latest && latest > today ? latest : today;
+
+    const holidays = await getHolidayKeys(prisma);
+    const result = await calculateSantanderCashFlow({
+      prisma,
+      companyId,
+      startDate,
+      endDate,
+      holidays,
+      filters: {
+        businessUnitId: filters.businessUnitId,
+        accountingAccountId: filters.accountingAccountId,
+        status: filters.status,
+        type: filters.type
+      }
+    });
+
+    return weeklyAccumulatedBalances(result.days, "projected", result.openingBalance, result.confirmedBalances, weekKeyOf);
+  } catch {
+    return new Map<string, Prisma.Decimal>();
+  }
 }
 
 function pageHref(page: number, filters: SearchParams) {

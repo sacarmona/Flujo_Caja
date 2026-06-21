@@ -8,9 +8,11 @@ import {
   calendarMonths,
   groupDaysByWeek,
   movementCellHref,
+  weeklyAccumulatedBalances,
   type CalendarAccount
 } from "./calendar-view";
 import type { CashFlowDay } from "./cash-flow";
+import { weekKeyOf } from "./iso-week";
 
 const accounts: CalendarAccount[] = [
   { id: "income", code: "1.01", name: "Servicios", parentName: "Ingresos", parentCode: "1" },
@@ -118,6 +120,16 @@ describe("calendar view helpers", () => {
     const balances = calendarAccumulatedBalances(days, "projected", new Prisma.Decimal(1000), confirmedBalances);
 
     expect(calendarCellAmount(balanceRow, days[1], "projected", balances).toString()).toBe("5090");
+  });
+
+  it("indexa el saldo acumulado por semana, dejando el saldo del ultimo dia habil de cada semana", () => {
+    // Lunes 15-jun y martes 16-jun (misma semana ISO), luego lunes 22-jun (semana siguiente).
+    const days = [day({ date: new Date(2026, 5, 15) }), day({ date: new Date(2026, 5, 16) }), day({ date: new Date(2026, 5, 22) })];
+    const weekly = weeklyAccumulatedBalances(days, "projected", new Prisma.Decimal(1000), new Map(), weekKeyOf);
+
+    expect(weekly.size).toBe(2);
+    expect(weekly.get(weekKeyOf(new Date(2026, 5, 16)))?.toString()).toBe("1180");
+    expect(weekly.get(weekKeyOf(new Date(2026, 5, 22)))?.toString()).toBe("1270");
   });
 
   it("builds links to movement filters by date and account", () => {

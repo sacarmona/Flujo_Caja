@@ -146,6 +146,33 @@ export function calendarAccumulatedBalances(
   return balances;
 }
 
+/**
+ * Igual que calendarAccumulatedBalances, pero indexado por semana ISO (en
+ * vez de por dia exacto): para cada semana queda el saldo del ultimo dia
+ * habil de esa semana, es decir el mismo saldo "al cierre de la semana" que
+ * muestra Vista Calendario. Se usa fuera del calendario (ej. Movimientos)
+ * para mostrar un numero consistente con esa vista.
+ */
+export function weeklyAccumulatedBalances(
+  days: CashFlowDay[],
+  mode: CalendarMode,
+  openingBalance: Prisma.Decimal,
+  confirmedBalances: Map<string, Prisma.Decimal> = new Map(),
+  weekKeyOf: (date: Date) => string
+): Map<string, Prisma.Decimal> {
+  const dailyBalances = calendarAccumulatedBalances(days, mode, openingBalance, confirmedBalances);
+  const weekly = new Map<string, Prisma.Decimal>();
+
+  for (const day of days) {
+    const balance = dailyBalances.get(dateKey(day.date));
+    if (balance) {
+      weekly.set(weekKeyOf(day.date), balance);
+    }
+  }
+
+  return weekly;
+}
+
 export function calendarCellAmount(
   row: CalendarRow,
   day: CashFlowDay,
