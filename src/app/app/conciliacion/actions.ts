@@ -5,6 +5,8 @@ import { Prisma } from "@prisma/client";
 import type { MovementType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { parseBankStatementFile } from "@/lib/bank-statement-import";
+import { todayInAppTimeZone } from "@/lib/format";
+import { weekKeyOf } from "@/lib/iso-week";
 import { parseRequiredDate, validateMovementInput, type MovementFormInput } from "@/lib/movements";
 import { nextRealDateAfterPayment, pendingBalance, statusFromPayments, validatePaymentAmount } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
@@ -74,10 +76,24 @@ export async function uploadBankStatementAction(formData: FormData) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const rawRows = await parseBankStatementFile(buffer);
+  const parsedRows = await parseBankStatementFile(buffer);
+
+  if (parsedRows.length === 0) {
+    throw new Error("La planilla no tiene movimientos para importar.");
+  }
+
+  /**
+   * Solo se concilia la semana en curso: si el saldo inicial de la semana
+   * ya quedo actualizado, los movimientos de semanas anteriores no
+   * necesitan revisarse de nuevo aunque vengan incluidos en la cartola
+   * (que suele traer varios dias o semanas previas).
+   */
+  const currentWeekKey = weekKeyOf(todayInAppTimeZone());
+  const rawRows = parsedRows.filter((row) => weekKeyOf(row.date) === currentWeekKey);
+  const skippedCount = parsedRows.length - rawRows.length;
 
   if (rawRows.length === 0) {
-    throw new Error("La planilla no tiene movimientos para importar.");
+    throw new Error("La cartola no tiene movimientos de la semana en curso (todos son de semanas anteriores).");
   }
 
   const dates = rawRows.map((row) => row.date.getTime());
@@ -88,7 +104,7 @@ export async function uploadBankStatementAction(formData: FormData) {
       data: {
         companyId: user.companyId,
         bankAccountId,
-        fileName: file.name,
+        fileName: skippedCount > 0 ? `${file.name} (se omitieron ${skippedCount} de semanas anteriores)` : file.name,
         status: "MAPPED",
         uploadedById: user.id
       }
