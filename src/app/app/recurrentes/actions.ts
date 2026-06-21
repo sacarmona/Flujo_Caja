@@ -13,6 +13,7 @@ import {
 import { generateMovementsForRecurrence, shouldPreserveRecurrenceMovement, shouldRewriteRecurrenceMovement } from "@/lib/recurrence-service";
 import { parseRecurrenceImportFile, resolveRecurrenceImportRow, type RecurrenceImportReferenceData } from "@/lib/recurrence-import";
 import type { RecurrenceImportState } from "@/lib/recurrence-import-state";
+import type { GenerateMovementsState } from "@/lib/generate-movements-state";
 import { getCurrentUser } from "@/lib/auth";
 import { getHolidayKeys } from "@/lib/holidays-cl";
 import { prisma } from "@/lib/prisma";
@@ -460,16 +461,25 @@ export async function setRecurrenceActiveAction(formData: FormData) {
   revalidatePath("/app/calendario");
 }
 
-export async function generateRecurringMovementsAction(formData: FormData) {
+export async function generateRecurringMovementsAction(
+  _prevState: GenerateMovementsState,
+  formData: FormData
+): Promise<GenerateMovementsState> {
   const user = await requireRecurrenceManager();
   const id = stringValue(formData, "id");
-  const holidays = await getHolidayKeys(prisma);
-  const result = await generateMovementsForRecurrence(id, {
-    prisma,
-    exchangeRateProvider: new CachedHttpExchangeRateProvider(prisma, user.companyId),
-    holidays,
-    months: 12
-  });
+
+  let result;
+  try {
+    const holidays = await getHolidayKeys(prisma);
+    result = await generateMovementsForRecurrence(id, {
+      prisma,
+      exchangeRateProvider: new CachedHttpExchangeRateProvider(prisma, user.companyId),
+      holidays,
+      months: 12
+    });
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : "No se pudo generar los movimientos." };
+  }
 
   await prisma.auditLog.create({
     data: {
@@ -485,10 +495,10 @@ export async function generateRecurringMovementsAction(formData: FormData) {
   revalidatePath("/app/movimientos");
 
   if (result.conversionErrors.length > 0) {
-    throw new Error(
-      `Se generaron ${result.created} movimientos. No se pudo obtener la tasa de cambio para ${result.conversionErrors.length} fecha(s): ${result.conversionErrors.join(" | ")}. Agrega una tasa manual a la regla para esas fechas o reintenta mas tarde.`
-    );
+    return { status: "partial", created: result.created, conversionErrors: result.conversionErrors };
   }
+
+  return { status: "success", created: result.created, skipped: result.skipped };
 }
 
 export async function getRecurrenceDefaults(companyId: string) {

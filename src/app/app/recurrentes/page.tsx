@@ -1,12 +1,7 @@
 import Link from "next/link";
 import type { MovementType, RecurrenceFrequency } from "@prisma/client";
-import {
-  createRecurrenceAction,
-  generateRecurringMovementsAction,
-  getRecurrenceDefaults,
-  setRecurrenceActiveAction,
-  updateRecurrenceAction
-} from "@/app/app/recurrentes/actions";
+import { createRecurrenceAction, getRecurrenceDefaults, setRecurrenceActiveAction, updateRecurrenceAction } from "@/app/app/recurrentes/actions";
+import { GenerateMovementsButton } from "@/app/app/recurrentes/generate-movements-button";
 import { RecurrenceForm } from "@/app/app/recurrentes/recurrence-form";
 import { RecurrenceImportForm } from "@/app/app/recurrentes/recurrence-import-form";
 import { typeLabels } from "@/app/app/movimientos/shared";
@@ -291,12 +286,7 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
                       submitLabel="Guardar"
                     />
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <form action={generateRecurringMovementsAction}>
-                        <input name="id" type="hidden" value={recurrence.id} />
-                        <button className="rounded-md bg-adentu-teal px-3 py-2 text-sm font-semibold text-white transition hover:bg-adentu-blue" type="submit">
-                          Generar 12 meses
-                        </button>
-                      </form>
+                      <GenerateMovementsButton recurrenceId={recurrence.id} />
                       <form action={setRecurrenceActiveAction} className="flex flex-wrap items-center gap-2">
                         <input name="id" type="hidden" value={recurrence.id} />
                         <input name="active" type="hidden" value={recurrence.isActive ? "false" : "true"} />
