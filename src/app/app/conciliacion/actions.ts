@@ -371,3 +371,70 @@ export async function reverseReconciliationAction(formData: FormData) {
   revalidatePath("/app/conciliacion");
   revalidatePath("/app/movimientos");
 }
+
+/**
+ * Borra una fila de la cartola que aun no fue confirmada (sin Payment ni
+ * Movement asociados todavia), respetando el orden de las relaciones sin
+ * onDelete: Cascade en el esquema (Reconciliation -> BankMovement). El
+ * BankImportRow original (datos crudos de la fila) se deja como respaldo de
+ * auditoria, no bloquea nada al no tener FK hacia BankMovement.
+ */
+async function deleteUnconfirmedBankMovement(tx: Prisma.TransactionClient, bankMovementId: string) {
+  await tx.reconciliation.deleteMany({ where: { bankMovementId } });
+  await tx.bankMovement.delete({ where: { id: bankMovementId } });
+}
+
+export async function discardBankMovementAction(formData: FormData) {
+  const user = await requireReconciliationManager();
+  const reconciliationId = stringValue(formData, "reconciliationId");
+
+  await prisma.$transaction(async (tx) => {
+    const reconciliation = await tx.reconciliation.findFirst({
+      where: { id: reconciliationId, bankMovement: { bankAccount: { companyId: user.companyId } } },
+      include: { bankMovement: true }
+    });
+    if (!reconciliation) {
+      throw new Error("La fila no existe.");
+    }
+    if (reconciliation.confirmed) {
+      throw new Error("Esta fila ya fue conciliada; usa Revertir en vez de descartar.");
+    }
+
+    const batchId = reconciliation.bankMovement.batchId;
+    await deleteUnconfirmedBankMovement(tx, reconciliation.bankMovementId);
+
+    const remaining = await tx.bankMovement.count({ where: { batchId } });
+    if (remaining === 0) {
+      await tx.bankImportBatch.delete({ where: { id: batchId } });
+    }
+  });
+
+  revalidatePath("/app/conciliacion");
+}
+
+export async function cancelImportBatchAction(formData: FormData) {
+  const user = await requireReconciliationManager();
+  const batchId = stringValue(formData, "batchId");
+
+  await prisma.$transaction(async (tx) => {
+    const batch = await tx.bankImportBatch.findFirst({
+      where: { id: batchId, companyId: user.companyId },
+      include: { bankMovements: { include: { reconciliation: true } } }
+    });
+    if (!batch) {
+      throw new Error("La importacion no existe.");
+    }
+
+    const unconfirmed = batch.bankMovements.filter((row) => !row.reconciliation?.confirmed);
+    for (const row of unconfirmed) {
+      await deleteUnconfirmedBankMovement(tx, row.id);
+    }
+
+    const remaining = await tx.bankMovement.count({ where: { batchId } });
+    if (remaining === 0) {
+      await tx.bankImportBatch.delete({ where: { id: batchId } });
+    }
+  });
+
+  revalidatePath("/app/conciliacion");
+}

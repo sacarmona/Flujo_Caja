@@ -2,7 +2,15 @@ import { getCurrentUser } from "@/lib/auth";
 import { accountMatchesMovementType } from "@/lib/movements";
 import { prisma } from "@/lib/prisma";
 import { canManageReconciliation, matchBankRow, movementTypeForBankType } from "@/lib/reconciliation";
-import { confirmReconciliationAction, createMovementFromBankRowAction, loadCandidates, reverseReconciliationAction, uploadBankStatementAction } from "./actions";
+import {
+  cancelImportBatchAction,
+  confirmReconciliationAction,
+  createMovementFromBankRowAction,
+  discardBankMovementAction,
+  loadCandidates,
+  reverseReconciliationAction,
+  uploadBankStatementAction
+} from "./actions";
 import { optionLabel } from "../movimientos/shared";
 import { formatCurrency } from "@/lib/format";
 
@@ -108,10 +116,20 @@ export default async function ConciliacionPage() {
         </p>
       ) : (
         <div className="space-y-6">
-          <p className="text-sm text-slate-600">
-            Ultima cartola importada: <strong>{latestBatch.fileName}</strong> ({latestBatch.bankAccount.name}), {formatDate(latestBatch.uploadedAt)}.
-            Pendientes por revisar: {pendingRows.length}. Ya conciliadas: {resolvedRows.length}.
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-slate-600">
+              Ultima cartola importada: <strong>{latestBatch.fileName}</strong> ({latestBatch.bankAccount.name}), {formatDate(latestBatch.uploadedAt)}.
+              Pendientes por revisar: {pendingRows.length}. Ya conciliadas: {resolvedRows.length}.
+            </p>
+            {canManage && pendingRows.length > 0 ? (
+              <form action={cancelImportBatchAction}>
+                <input name="batchId" type="hidden" value={latestBatch.id} />
+                <button className="rounded-md border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50" type="submit">
+                  Cancelar importacion completa ({pendingRows.length} fila{pendingRows.length === 1 ? "" : "s"} pendiente{pendingRows.length === 1 ? "" : "s"})
+                </button>
+              </form>
+            ) : null}
+          </div>
 
           <div className="space-y-4">
             {pendingRows.map((row) => {
@@ -128,9 +146,19 @@ export default async function ConciliacionPage() {
                         {formatDate(row.date)} · {row.type === "CARGO" ? "Cargo (egreso)" : "Abono (ingreso)"} · {row.reference ? `Doc. ${row.reference}` : "Sin N° documento"}
                       </p>
                     </div>
-                    <p className={`text-sm font-semibold ${row.type === "CARGO" ? "text-red-700" : "text-emerald-700"}`}>
-                      {formatCurrency(Number(row.amount))}
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <p className={`text-sm font-semibold ${row.type === "CARGO" ? "text-red-700" : "text-emerald-700"}`}>
+                        {formatCurrency(Number(row.amount))}
+                      </p>
+                      {canManage ? (
+                        <form action={discardBankMovementAction}>
+                          <input name="reconciliationId" type="hidden" value={row.reconciliation?.id} />
+                          <button className="text-xs font-semibold text-slate-500 underline hover:text-red-700" type="submit">
+                            Descartar
+                          </button>
+                        </form>
+                      ) : null}
+                    </div>
                   </div>
 
                   {live.matchLevel === "HIGH" && live.movementId ? (
