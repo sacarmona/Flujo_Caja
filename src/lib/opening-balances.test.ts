@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   assertCanManageOpeningBalances,
+  effectiveOpeningBalance,
   parseOpeningBalanceAmount,
   suggestedOpeningBalanceWeek,
   weekOpeningBalance
@@ -88,6 +89,27 @@ describe("opening balance helpers", () => {
     expect(suggested?.amount.toFixed(0)).toBe("719181");
   });
 
+  it("no descarta una semana posterior solo porque su lunes es feriado (primer dia disponible es martes)", () => {
+    // Semana 26 (22-jun, lunes) confirmada; semana 27 con lunes 29-jun feriado, primer dia disponible martes 30-jun, aun sin confirmar.
+    const days = [
+      day(new Date(2026, 5, 22), 0, 619181),
+      day(new Date(2026, 5, 26), 100000, 719181),
+      day(new Date(2026, 5, 30), 0, 719181) // martes: el lunes 29-jun (feriado) no aparece en days
+    ];
+    const result: CashFlowResult = {
+      openingBalance: new Prisma.Decimal(1046293),
+      days,
+      weeks: [],
+      confirmedBalances: new Map([["2026-06-22", new Prisma.Decimal(619181)]])
+    };
+    const weeks = [{ days: [days[0], days[1]] }, { days: [days[2]] }];
+
+    const suggested = suggestedOpeningBalanceWeek(result, weeks);
+
+    expect(suggested?.date.getTime()).toBe(days[2].date.getTime());
+    expect(suggested?.amount.toFixed(0)).toBe("719181");
+  });
+
   it("si todas las semanas visibles ya estan confirmadas, sugiere la ultima en vez de volver a la primera", () => {
     const days = [day(new Date(2026, 5, 22), 0, 619181), day(new Date(2026, 5, 29), 0, 800000)];
     const result: CashFlowResult = {
@@ -104,5 +126,34 @@ describe("opening balance helpers", () => {
     const suggested = suggestedOpeningBalanceWeek(result, weeks);
 
     expect(suggested?.date.getTime()).toBe(days[1].date.getTime());
+  });
+
+  it("effectiveOpeningBalance muestra la ultima confirmacion guardada, aunque sea de una semana futura a hoy", () => {
+    const sinConfirmar: CashFlowResult = {
+      openingBalance: new Prisma.Decimal(1046293),
+      days: [],
+      weeks: [],
+      confirmedBalances: new Map()
+    };
+    expect(effectiveOpeningBalance(sinConfirmar).toFixed(0)).toBe("1046293");
+
+    const conConfirmacionFutura: CashFlowResult = {
+      openingBalance: new Prisma.Decimal(1046293),
+      days: [],
+      weeks: [],
+      confirmedBalances: new Map([["2026-06-22", new Prisma.Decimal(619181)]])
+    };
+    expect(effectiveOpeningBalance(conConfirmacionFutura).toFixed(0)).toBe("619181");
+
+    const conVariasConfirmaciones: CashFlowResult = {
+      openingBalance: new Prisma.Decimal(1046293),
+      days: [],
+      weeks: [],
+      confirmedBalances: new Map([
+        ["2026-06-22", new Prisma.Decimal(619181)],
+        ["2026-06-29", new Prisma.Decimal(800000)]
+      ])
+    };
+    expect(effectiveOpeningBalance(conVariasConfirmaciones).toFixed(0)).toBe("800000");
   });
 });

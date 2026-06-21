@@ -47,6 +47,25 @@ export function dateInputValue(date: Date): string {
   return dateKey(date);
 }
 
+/**
+ * Saldo inicial "vigente" para mostrar en el encabezado: result.openingBalance
+ * es el saldo al dia de hoy (calculateOpeningBalance solo mira confirmaciones
+ * con fecha <= hoy), asi que una correccion confirmada para una semana
+ * futura (ej. la siguiente semana, antes de que llegue esa fecha) no se
+ * reflejaba ahi aunque ya estuviera guardada. Esta funcion toma la
+ * confirmacion mas reciente que exista (sea de hoy o de una semana futura
+ * ya corregida), para que el encabezado siempre muestre el ultimo numero
+ * que el usuario confirmo, no el calculado antes de esa correccion.
+ */
+export function effectiveOpeningBalance(result: CashFlowResult): Prisma.Decimal {
+  const latestConfirmedKey = [...result.confirmedBalances.keys()].sort().at(-1);
+  if (!latestConfirmedKey) {
+    return result.openingBalance;
+  }
+
+  return result.confirmedBalances.get(latestConfirmedKey) ?? result.openingBalance;
+}
+
 export function weekOpeningBalance(result: CashFlowResult, weekDays: CashFlowDay[]): Prisma.Decimal {
   const firstDay = weekDays[0];
   if (!firstDay) return result.openingBalance;
@@ -66,7 +85,13 @@ export function weekOpeningBalance(result: CashFlowResult, weekDays: CashFlowDay
  * confirmado correcto con ese valor desactualizado).
  */
 export function suggestedOpeningBalanceWeek(result: CashFlowResult, weeks: Array<{ days: CashFlowDay[] }>) {
-  const fullWeeks = weeks.filter((week) => week.days[0]?.date.getDay() === 1);
+  /**
+   * Solo la primera semana visible puede ser parcial (si el rango empieza a
+   * mitad de semana); a partir de la segunda, groupDaysByWeek ya agrupa
+   * semanas completas por clave de lunes aunque el lunes sea feriado (su
+   * primer dia disponible puede ser martes y aun asi es una semana completa).
+   */
+  const fullWeeks = weeks.filter((week, index) => index > 0 || week.days[0]?.date.getDay() === 1);
   const isConfirmed = (week: { days: CashFlowDay[] }) => {
     const firstDay = week.days[0];
     return firstDay ? result.confirmedBalances.has(dateKey(firstDay.date)) : false;

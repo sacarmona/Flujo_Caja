@@ -18,7 +18,7 @@ import { formatCurrency, todayInAppTimeZone } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { getHolidayKeys } from "@/lib/holidays-cl";
 import { movementCurrencies, movementStatuses, movementTypes } from "@/lib/movements";
-import { canManageOpeningBalances, dateInputValue, suggestedOpeningBalanceWeek } from "@/lib/opening-balances";
+import { canManageOpeningBalances, dateInputValue, effectiveOpeningBalance, suggestedOpeningBalanceWeek } from "@/lib/opening-balances";
 import { prisma } from "@/lib/prisma";
 import { removeOpeningBalanceAction, updateOpeningBalanceAction } from "./actions";
 
@@ -146,6 +146,7 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
   const suggestedOpening = suggestedOpeningBalanceWeek(result, weeks);
   const confirmedForSuggestedWeek = suggestedOpening ? result.confirmedBalances.get(dateKey(suggestedOpening.date)) : undefined;
   const canEditOpeningBalance = canManageOpeningBalances(user.role);
+  const headlineOpeningBalance = effectiveOpeningBalance(result);
 
   return (
     <section className="max-w-none">
@@ -236,7 +237,7 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
           </span>
           <div>
             <h2 className="text-sm font-semibold text-adentu-ink">Saldo inicial Santander</h2>
-            <p className="mt-1 text-2xl font-semibold text-adentu-ink">{formatCurrency(Number(result.openingBalance))}</p>
+            <p className="mt-1 text-2xl font-semibold text-adentu-ink">{formatCurrency(Number(headlineOpeningBalance))}</p>
             {suggestedOpening ? (
               <p className="mt-1 text-xs text-slate-600">
                 Semana {dateLabel(suggestedOpening.date)} calculada en {formatCurrency(Number(suggestedOpening.amount))}
@@ -335,7 +336,7 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
             </tr>
             <tr>
               <th className="sticky left-0 z-30 border-r border-slate-200 bg-white px-3 py-2 text-left text-xs text-slate-500">
-                Saldo inicial {formatCurrency(Number(result.openingBalance))}
+                Saldo inicial {formatCurrency(Number(headlineOpeningBalance))}
               </th>
               {result.days.map((day) => (
                 <th className="min-w-28 border-r border-slate-200 px-2 py-2 text-center text-xs font-medium text-slate-600" key={dateKey(day.date)}>
