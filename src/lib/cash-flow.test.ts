@@ -240,6 +240,57 @@ describe("cash flow business-day service", () => {
     expect(result.days[0].realExpense.toString()).toBe("40000");
   });
 
+  it("pone al dia el saldo inicial con lo Real cobrado/pagado de una semana que ya no esta en el rango visible", () => {
+    const result = calculateCashFlowByBusinessDay(
+      [
+        {
+          ...baseMovement,
+          id: "paid-last-week",
+          type: "INCOME" as const,
+          status: "PAID_OR_COLLECTED" as const,
+          projectedDate: date("2026-06-17"),
+          projectedAmountClp: "300000",
+          accountingAccountId: incomeAccount.id,
+          businessUnitId: unitOps.id,
+          accountingAccount: incomeAccount,
+          businessUnit: unitOps,
+          payments: [{ id: "pay-last-week", amount: "300000", paidAt: date("2026-06-18"), currency: "CLP" as const }]
+        },
+        {
+          ...baseMovement,
+          id: "paid-expense-last-week",
+          type: "EXPENSE" as const,
+          status: "PAID_OR_COLLECTED" as const,
+          projectedDate: date("2026-06-19"),
+          projectedAmountClp: "50000",
+          accountingAccountId: expenseAccount.id,
+          businessUnitId: unitAdmin.id,
+          accountingAccount: expenseAccount,
+          businessUnit: unitAdmin,
+          payments: [{ id: "pay-expense-last-week", amount: "50000", paidAt: date("2026-06-19"), currency: "CLP" as const }]
+        },
+        {
+          ...baseMovement,
+          id: "still-pending-last-week",
+          type: "INCOME" as const,
+          status: "PENDING" as const,
+          projectedDate: date("2026-06-18"),
+          projectedAmountClp: "999999",
+          accountingAccountId: incomeAccount.id,
+          businessUnitId: unitOps.id,
+          accountingAccount: incomeAccount,
+          businessUnit: unitOps
+        }
+      ],
+      [{ amount: "1000000", balanceDate: date("2026-06-15"), deletedAt: null }],
+      { startDate: date("2026-06-22"), endDate: date("2026-06-22") }
+    );
+
+    // 1000000 (confirmado el 15-jun) + 300000 cobrado el 18 - 50000 pagado el 19 = 1250000.
+    // El Pendiente de 999999 (still-pending-last-week) no se suma: nunca se cobro.
+    expect(result.openingBalance.toString()).toBe("1250000");
+  });
+
   it("usa por defecto el saldo calculado entre semanas, pero respeta un saldo confirmado/actualizado a mitad de rango", () => {
     const result = calculateCashFlowByBusinessDay(
       [],

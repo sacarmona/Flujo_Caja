@@ -216,12 +216,61 @@ function addFullProjectedEntry(day: CashFlowDay, movement: CashFlowMovement, amo
   addToAllLevels(day, movement, movement.type === "INCOME" ? "fullProjectedIncome" : "fullProjectedExpense", amount);
 }
 
-export function calculateOpeningBalance(openingBalances: CashFlowOpeningBalance[], startDate: Date): Prisma.Decimal {
+function latestConfirmedBalance(openingBalances: CashFlowOpeningBalance[], startDate: Date) {
   const latest = openingBalances
     .filter((balance) => !balance.deletedAt && balance.balanceDate <= startDate)
     .sort((a, b) => b.balanceDate.getTime() - a.balanceDate.getTime())[0];
 
-  return latest ? decimal(latest.amount) : new Prisma.Decimal(0);
+  return latest ? { amount: decimal(latest.amount), date: latest.balanceDate } : null;
+}
+
+export function calculateOpeningBalance(openingBalances: CashFlowOpeningBalance[], startDate: Date): Prisma.Decimal {
+  return latestConfirmedBalance(openingBalances, startDate)?.amount ?? new Prisma.Decimal(0);
+}
+
+/**
+ * Suma el flujo Real (Parcial + Pagado/Cobrado, igual que Modo Real) entre
+ * dos fechas, sin desglosar por dia: se usa para "poner al dia" el saldo
+ * inicial con lo cobrado/pagado en semanas que ya quedaron fuera del rango
+ * visible (que siempre empieza en "hoy") sin haber sido confirmadas a
+ * tiempo. Asi el saldo base de Proyectado y del saldo diario actual no
+ * queda atrasado solo porque nadie llego a confirmar esa semana antes de
+ * que pasara.
+ */
+function calculateRealNetFlow(
+  movements: CashFlowMovement[],
+  filters: CashFlowFilters | undefined,
+  fromDate: Date,
+  toDate: Date,
+  holidaySet: Set<string>
+): Prisma.Decimal {
+  let total = new Prisma.Decimal(0);
+  if (fromDate > toDate) return total;
+
+  for (const movement of movements.filter((item) => !item.deletedAt && !item.cancelledAt && item.status !== "CANCELLED")) {
+    if (!matchesFilters(movement, filters) || !realEligibleStatuses.includes(movement.status)) {
+      continue;
+    }
+
+    const sign = movement.type === "INCOME" ? 1 : -1;
+    const active = movement.payments.filter((payment) => !payment.deletedAt && !payment.cancelledAt);
+
+    if (active.length > 0) {
+      for (const payment of active) {
+        const paymentDate = moveToNextBusinessDay(payment.paidAt, holidaySet);
+        if (paymentDate >= fromDate && paymentDate <= toDate) {
+          total = total.plus(decimal(payment.amount).mul(sign));
+        }
+      }
+    } else {
+      const projectedDate = moveToNextBusinessDay(movement.projectedDate, holidaySet);
+      if (projectedDate >= fromDate && projectedDate <= toDate) {
+        total = total.plus(decimal(movement.projectedAmountClp).mul(sign));
+      }
+    }
+  }
+
+  return total;
 }
 
 export function calculateCashFlowByBusinessDay(
@@ -231,7 +280,13 @@ export function calculateCashFlowByBusinessDay(
 ): CashFlowResult {
   const { startDate, endDate } = normalizeRange(options);
   const holidaySet = new Set(options.holidays ?? []);
-  const openingBalance = calculateOpeningBalance(openingBalances, startDate);
+  const confirmed = latestConfirmedBalance(openingBalances, startDate);
+  const catchUpFrom = confirmed ? addDays(confirmed.date, 1) : null;
+  const catchUpRealNetFlow =
+    catchUpFrom && catchUpFrom < startDate
+      ? calculateRealNetFlow(movements, options.filters, catchUpFrom, addDays(startDate, -1), holidaySet)
+      : new Prisma.Decimal(0);
+  const openingBalance = (confirmed?.amount ?? new Prisma.Decimal(0)).plus(catchUpRealNetFlow);
   const days = businessDaysBetween(startDate, endDate, options.holidays).map<CashFlowDay>((date) => ({
     date,
     ...zeroTotals(),
