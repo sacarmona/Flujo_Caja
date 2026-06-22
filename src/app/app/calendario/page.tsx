@@ -282,100 +282,105 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
         </button>
       </form>
 
-      <section className="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 lg:grid-cols-[1fr_1.4fr]">
-        <div className="flex items-start gap-3">
-          <span className="rounded-md bg-adentu-mist p-2 text-adentu-blue">
-            <WalletCards className="size-5" aria-hidden="true" />
-          </span>
-          <div>
-            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-              <div>
-                <h2 className="text-sm font-semibold text-adentu-ink">Saldo inicial Santander</h2>
-                <p className="mt-1 text-2xl font-semibold text-adentu-ink">{formatCurrency(Number(headlineOpeningBalance))}</p>
-              </div>
-              {currentDay ? (
-                <div>
-                  <h2 className="text-sm font-semibold text-adentu-ink">Saldo diario actual ({dateLabel(currentDay.date)})</h2>
-                  <p className="mt-1 text-2xl font-semibold text-adentu-teal">{formatCurrency(Number(currentRealBalance))}</p>
-                  <p className="mt-1 text-xs text-slate-500">Solo movimientos Parcial y Pagado/Cobrado (Modo Real).</p>
+      <section className="mt-4 flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 bg-white px-4 py-3">
+        <span className="rounded-md bg-adentu-mist p-2 text-adentu-blue">
+          <WalletCards className="size-5" aria-hidden="true" />
+        </span>
+
+        <div>
+          <h2 className="text-xs font-semibold text-slate-600">Saldo inicial Santander</h2>
+          <p className="text-xl font-semibold text-adentu-ink">{formatCurrency(Number(headlineOpeningBalance))}</p>
+        </div>
+
+        {currentDay ? (
+          <>
+            <span className="hidden h-8 w-px bg-slate-200 sm:block" aria-hidden="true" />
+            <div>
+              <h2 className="text-xs font-semibold text-slate-600">Saldo diario actual ({dateLabel(currentDay.date)})</h2>
+              <p className="text-xl font-semibold text-adentu-teal">{formatCurrency(Number(currentRealBalance))}</p>
+              <p className="text-[11px] text-slate-500">Solo Parcial y Pagado/Cobrado (Modo Real)</p>
+            </div>
+          </>
+        ) : null}
+
+        {suggestedOpening ? (
+          <>
+            <span className="hidden h-8 w-px bg-slate-200 sm:block" aria-hidden="true" />
+            <div className="flex flex-col gap-1">
+              <p className="text-xs text-slate-600">
+                Semana {dateLabel(suggestedOpening.date)} calculada en {formatCurrency(Number(suggestedOpening.amount))}
+              </p>
+              {confirmedForSuggestedWeek ? (
+                <p className="text-[11px] font-medium text-amber-700">
+                  Confirmado: {formatCurrency(Number(confirmedForSuggestedWeek))}
+                  {!confirmedForSuggestedWeek.eq(suggestedOpening.amount) ? " (distinto del calculado)" : null}
+                </p>
+              ) : null}
+              {canEditOpeningBalance ? (
+                <div className="flex flex-wrap gap-2">
+                  <form action={updateOpeningBalanceAction}>
+                    <input type="hidden" name="balanceDate" value={dateInputValue(suggestedOpening.date)} />
+                    {/* parseOpeningBalanceAmount espera coma decimal (formato chileno); un punto crudo se confunde con separador de miles y multiplica el monto por 100. */}
+                    <input type="hidden" name="amount" value={suggestedOpening.amount.toFixed(2).replace(".", ",")} />
+                    <input
+                      type="hidden"
+                      name="note"
+                      value={`Saldo confirmado desde Calendario para la semana ${dateInputValue(suggestedOpening.date)}.`}
+                    />
+                    <button
+                      className="rounded-md border border-adentu-blue px-2 py-1 text-xs font-semibold text-adentu-blue transition hover:bg-adentu-mist"
+                      type="submit"
+                    >
+                      Confirmar calculado
+                    </button>
+                  </form>
+                  {confirmedForSuggestedWeek ? (
+                    <form action={removeOpeningBalanceAction}>
+                      <input type="hidden" name="balanceDate" value={dateInputValue(suggestedOpening.date)} />
+                      <button
+                        className="rounded-md border border-amber-600 px-2 py-1 text-xs font-semibold text-amber-700 transition hover:bg-amber-50"
+                        type="submit"
+                      >
+                        Quitar saldo confirmado
+                      </button>
+                    </form>
+                  ) : null}
                 </div>
               ) : null}
             </div>
-            {suggestedOpening ? (
-              <p className="mt-1 text-xs text-slate-600">
-                Semana {dateLabel(suggestedOpening.date)} calculada en {formatCurrency(Number(suggestedOpening.amount))}
-              </p>
-            ) : null}
-            {confirmedForSuggestedWeek ? (
-              <p className="mt-1 text-xs font-medium text-amber-700">
-                Saldo confirmado/actualizado para esa semana: {formatCurrency(Number(confirmedForSuggestedWeek))}
-                {!confirmedForSuggestedWeek.eq(suggestedOpening?.amount ?? 0) ? " (distinto del calculado)" : null}
-              </p>
-            ) : null}
-          </div>
-        </div>
+          </>
+        ) : null}
 
-        {canEditOpeningBalance ? (
-          <div className="grid gap-3 md:grid-cols-[auto_1fr]">
-            {suggestedOpening ? (
-              <div className="flex flex-wrap items-end gap-2">
-                <form action={updateOpeningBalanceAction} className="flex flex-wrap items-end gap-2">
-                  <input type="hidden" name="balanceDate" value={dateInputValue(suggestedOpening.date)} />
-                  {/* parseOpeningBalanceAmount espera coma decimal (formato chileno); un punto crudo se confunde con separador de miles y multiplica el monto por 100. */}
-                  <input type="hidden" name="amount" value={suggestedOpening.amount.toFixed(2).replace(".", ",")} />
-                  <input
-                    type="hidden"
-                    name="note"
-                    value={`Saldo confirmado desde Calendario para la semana ${dateInputValue(suggestedOpening.date)}.`}
-                  />
-                  <button
-                    className="rounded-md border border-adentu-blue px-3 py-2 text-sm font-semibold text-adentu-blue transition hover:bg-adentu-mist"
-                    type="submit"
-                  >
-                    Confirmar calculado
-                  </button>
-                </form>
-                {confirmedForSuggestedWeek ? (
-                  <form action={removeOpeningBalanceAction}>
-                    <input type="hidden" name="balanceDate" value={dateInputValue(suggestedOpening.date)} />
-                    <button
-                      className="rounded-md border border-amber-600 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-50"
-                      type="submit"
-                    >
-                      Quitar saldo confirmado
-                    </button>
-                  </form>
-                ) : null}
-              </div>
-            ) : null}
-            <form action={updateOpeningBalanceAction} className="grid gap-2 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(10rem,1fr)_auto]">
-              <label className="text-sm">
+        <div className="ml-auto">
+          {canEditOpeningBalance ? (
+            <form action={updateOpeningBalanceAction} className="flex flex-wrap items-end gap-2">
+              <label className="text-xs">
                 <span className="mb-1 block text-slate-600">Fecha</span>
                 <input
-                  className="w-full rounded-md border border-slate-300 px-2 py-2"
+                  className="w-32 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
                   name="balanceDate"
                   type="date"
                   defaultValue={suggestedOpening ? dateInputValue(suggestedOpening.date) : dateInputValue(startDate)}
                 />
               </label>
-              <label className="text-sm">
+              <label className="text-xs">
                 <span className="mb-1 block text-slate-600">Nuevo saldo</span>
                 <input
-                  className="w-full rounded-md border border-slate-300 px-2 py-2"
+                  className="w-28 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
                   name="amount"
                   inputMode="decimal"
                   placeholder="$0"
                 />
               </label>
               <input type="hidden" name="note" value="Saldo inicial ingresado manualmente desde Calendario." />
-              <button className="self-end rounded-md bg-adentu-blue px-3 py-2 text-sm font-semibold text-white transition hover:bg-adentu-teal" type="submit">
+              <button className="rounded-md bg-adentu-blue px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-adentu-teal" type="submit">
                 Actualizar
               </button>
             </form>
-          </div>
-        ) : (
-          <p className="self-center text-sm text-slate-600">Solo ADMIN y FINANCE pueden actualizar el saldo inicial.</p>
-        )}
+          ) : (
+            <p className="text-sm text-slate-600">Solo ADMIN y FINANCE pueden actualizar el saldo inicial.</p>
+          )}
+        </div>
       </section>
 
       <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-600">
