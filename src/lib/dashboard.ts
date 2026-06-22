@@ -70,8 +70,8 @@ export function upcomingWeeklySummaries(result: CashFlowResult, limit = 4): Week
     return {
       weekStart: week.weekStart,
       weekEnd: week.weekEnd,
-      income: week.projectedIncome.plus(week.realIncome),
-      expense: week.projectedExpense.plus(week.realExpense),
+      income: week.projectedIncome.plus(week.pendingIncome),
+      expense: week.projectedExpense.plus(week.pendingExpense),
       netFlow: week.netFlow,
       endingBalance: lastDay?.accumulatedBalance ?? result.openingBalance
     };

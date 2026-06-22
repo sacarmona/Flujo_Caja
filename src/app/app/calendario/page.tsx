@@ -56,6 +56,7 @@ const statusLabels: Record<MovementStatus, string> = {
 
 const modeLabels: Record<CalendarMode, string> = {
   projected: "Proyectado",
+  pending: "Pendiente",
   real: "Real",
   comparison: "Comparacion"
 };

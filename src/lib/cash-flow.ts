@@ -64,14 +64,24 @@ export type CashFlowOptions = {
 export type CashFlowGroupTotals = {
   projectedIncome: Prisma.Decimal;
   projectedExpense: Prisma.Decimal;
+  /**
+   * Pendiente: Pendiente + Parcial + Pagado/Cobrado. Mutuamente excluyente
+   * con projectedIncome/projectedExpense (Proyectado y Vencido) para evitar
+   * doble conteo en el saldo combinado (usado por el dashboard, Modo
+   * Comparacion y la sugerencia de saldo inicial).
+   */
+  pendingIncome: Prisma.Decimal;
+  pendingExpense: Prisma.Decimal;
+  /**
+   * Real: solo Parcial + Pagado/Cobrado (subconjunto de pendingIncome/
+   * pendingExpense, sin incluir Pendiente). Usado exclusivamente por Modo
+   * Real del Calendario.
+   */
   realIncome: Prisma.Decimal;
   realExpense: Prisma.Decimal;
   /**
    * Pronostico completo: todos los movimientos no cancelados (cualquier
-   * estado), siempre con su fecha y monto proyectados. Independiente de
-   * projectedIncome/projectedExpense, que son mutuamente excluyentes con
-   * realIncome/realExpense para evitar doble conteo en el saldo combinado
-   * (usado por el dashboard y la sugerencia de saldo inicial).
+   * estado), siempre con su fecha y monto proyectados.
    */
   fullProjectedIncome: Prisma.Decimal;
   fullProjectedExpense: Prisma.Decimal;
@@ -103,6 +113,8 @@ export type CashFlowResult = {
 const zeroTotals = (): CashFlowGroupTotals => ({
   projectedIncome: new Prisma.Decimal(0),
   projectedExpense: new Prisma.Decimal(0),
+  pendingIncome: new Prisma.Decimal(0),
+  pendingExpense: new Prisma.Decimal(0),
   realIncome: new Prisma.Decimal(0),
   realExpense: new Prisma.Decimal(0),
   fullProjectedIncome: new Prisma.Decimal(0),
@@ -174,18 +186,14 @@ function movementCategory(movement: CashFlowMovement) {
 }
 
 /**
- * Estados que cuentan como "Real" en el calendario: dinero ya cobrado/pagado
- * (parcial o total) o movimientos vencidos para pago/cobro (Pendiente).
- * Proyectado y Vencido no entran al Real; Cancelado ya se excluye antes.
+ * Estados que cuentan como "Pendiente" en el calendario: dinero ya
+ * cobrado/pagado (parcial o total) o movimientos en espera de pago/cobro.
+ * Proyectado y Vencido no entran; Cancelado ya se excluye antes.
  */
-const realEligibleStatuses: MovementStatus[] = ["PENDING", "PARTIALLY_PAID", "PAID_OR_COLLECTED"];
+const pendingEligibleStatuses: MovementStatus[] = ["PENDING", "PARTIALLY_PAID", "PAID_OR_COLLECTED"];
 
-function bucketFor(type: MovementType, isReal: boolean): keyof CashFlowGroupTotals {
-  if (type === "INCOME") {
-    return isReal ? "realIncome" : "projectedIncome";
-  }
-  return isReal ? "realExpense" : "projectedExpense";
-}
+/** Estados que cuentan como "Real": solo dinero efectivamente cobrado/pagado, parcial o total (sin Pendiente). */
+const realEligibleStatuses: MovementStatus[] = ["PARTIALLY_PAID", "PAID_OR_COLLECTED"];
 
 function addToAllLevels(day: CashFlowDay, movement: CashFlowMovement, bucket: keyof CashFlowGroupTotals, amount: Prisma.Decimal) {
   addToTotals(day, bucket, amount);
@@ -194,8 +202,14 @@ function addToAllLevels(day: CashFlowDay, movement: CashFlowMovement, bucket: ke
   addToTotals(getTotals(day.byBusinessUnit, movement.businessUnit.name), bucket, amount);
 }
 
-function addEntry(day: CashFlowDay, movement: CashFlowMovement, amount: Prisma.Decimal, isReal: boolean) {
-  addToAllLevels(day, movement, bucketFor(movement.type, isReal), amount);
+function addEntry(day: CashFlowDay, movement: CashFlowMovement, amount: Prisma.Decimal, status: MovementStatus) {
+  const isIncome = movement.type === "INCOME";
+  const isPending = pendingEligibleStatuses.includes(status);
+  addToAllLevels(day, movement, isPending ? (isIncome ? "pendingIncome" : "pendingExpense") : isIncome ? "projectedIncome" : "projectedExpense", amount);
+
+  if (realEligibleStatuses.includes(status)) {
+    addToAllLevels(day, movement, isIncome ? "realIncome" : "realExpense", amount);
+  }
 }
 
 function addFullProjectedEntry(day: CashFlowDay, movement: CashFlowMovement, amount: Prisma.Decimal) {
@@ -241,18 +255,17 @@ export function calculateCashFlowByBusinessDay(
     }
 
     const active = movement.payments.filter((payment) => !payment.deletedAt && !payment.cancelledAt);
-    const isReal = realEligibleStatuses.includes(movement.status);
 
     if (active.length > 0) {
       for (const payment of active) {
         const paymentDate = moveToNextBusinessDay(payment.paidAt, holidaySet);
         const day = dayByKey.get(dateKey(paymentDate));
         if (day) {
-          addEntry(day, movement, decimal(payment.amount), true);
+          addEntry(day, movement, decimal(payment.amount), movement.status);
         }
       }
     } else if (projectedDay) {
-      addEntry(projectedDay, movement, decimal(movement.projectedAmountClp), isReal);
+      addEntry(projectedDay, movement, decimal(movement.projectedAmountClp), movement.status);
     }
   }
 
@@ -273,7 +286,7 @@ export function calculateCashFlowByBusinessDay(
     if (confirmed) {
       accumulated = confirmed;
     }
-    day.netFlow = day.projectedIncome.plus(day.realIncome).minus(day.projectedExpense).minus(day.realExpense);
+    day.netFlow = day.projectedIncome.plus(day.pendingIncome).minus(day.projectedExpense).minus(day.pendingExpense);
     accumulated = accumulated.plus(day.netFlow);
     day.accumulatedBalance = accumulated;
   }
@@ -290,6 +303,8 @@ export function calculateCashFlowByBusinessDay(
     };
     week.projectedIncome = week.projectedIncome.plus(day.projectedIncome);
     week.projectedExpense = week.projectedExpense.plus(day.projectedExpense);
+    week.pendingIncome = week.pendingIncome.plus(day.pendingIncome);
+    week.pendingExpense = week.pendingExpense.plus(day.pendingExpense);
     week.realIncome = week.realIncome.plus(day.realIncome);
     week.realExpense = week.realExpense.plus(day.realExpense);
     week.fullProjectedIncome = week.fullProjectedIncome.plus(day.fullProjectedIncome);

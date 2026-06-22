@@ -36,6 +36,8 @@ function day(date: Date, accumulatedBalance: number): CashFlowDay {
     date,
     projectedIncome: zero(),
     projectedExpense: zero(),
+    pendingIncome: zero(),
+    pendingExpense: zero(),
     realIncome: zero(),
     realExpense: zero(),
     fullProjectedIncome: zero(),

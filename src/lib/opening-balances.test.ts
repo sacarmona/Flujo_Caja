@@ -18,6 +18,8 @@ function day(date: Date, netFlow: number, accumulatedBalance: number): CashFlowD
     date,
     projectedIncome: netFlow > 0 ? new Prisma.Decimal(netFlow) : zero(),
     projectedExpense: netFlow < 0 ? new Prisma.Decimal(Math.abs(netFlow)) : zero(),
+    pendingIncome: zero(),
+    pendingExpense: zero(),
     realIncome: zero(),
     realExpense: zero(),
     fullProjectedIncome: netFlow > 0 ? new Prisma.Decimal(netFlow) : zero(),

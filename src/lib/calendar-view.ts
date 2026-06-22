@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import type { CashFlowDay, CashFlowGroupTotals, CashFlowResult } from "./cash-flow";
 import { dateKey } from "./recurrences";
 
-export type CalendarMode = "projected" | "real" | "comparison";
+export type CalendarMode = "projected" | "pending" | "real" | "comparison";
 
 export type CalendarAccount = {
   id: string;
@@ -30,7 +30,7 @@ export function calendarMonths(value?: string | number): 3 | 6 | 9 | 12 {
 }
 
 export function calendarMode(value?: string): CalendarMode {
-  return value === "real" || value === "comparison" ? value : "projected";
+  return value === "real" || value === "pending" || value === "comparison" ? value : "projected";
 }
 
 /**
@@ -102,18 +102,21 @@ export function buildCalendarRows(accounts: CalendarAccount[], collapsedCategori
 function modeAmount(totals: CashFlowGroupTotals, mode: CalendarMode, type: "income" | "expense") {
   if (type === "income") {
     if (mode === "projected") return totals.fullProjectedIncome;
+    if (mode === "pending") return totals.pendingIncome;
     if (mode === "real") return totals.realIncome;
-    return totals.projectedIncome.plus(totals.realIncome);
+    return totals.projectedIncome.plus(totals.pendingIncome);
   }
 
   if (mode === "projected") return totals.fullProjectedExpense;
+  if (mode === "pending") return totals.pendingExpense;
   if (mode === "real") return totals.realExpense;
-  return totals.projectedExpense.plus(totals.realExpense);
+  return totals.projectedExpense.plus(totals.pendingExpense);
 }
 
-/** Flujo neto del dia segun el modo seleccionado (Proyectado: pronostico completo; Real: solo lo cobrado/pagado/pendiente; Comparacion: combinado mutuamente excluyente). */
+/** Flujo neto del dia segun el modo seleccionado (Proyectado: pronostico completo; Pendiente: Pendiente+Parcial+Pagado/Cobrado; Real: solo Parcial+Pagado/Cobrado; Comparacion: combinado mutuamente excluyente). */
 function calendarNetFlow(day: CashFlowDay, mode: CalendarMode): Prisma.Decimal {
   if (mode === "projected") return day.fullProjectedIncome.minus(day.fullProjectedExpense);
+  if (mode === "pending") return day.pendingIncome.minus(day.pendingExpense);
   if (mode === "real") return day.realIncome.minus(day.realExpense);
   return day.netFlow;
 }

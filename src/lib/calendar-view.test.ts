@@ -28,8 +28,10 @@ function day(overrides: Partial<CashFlowDay> = {}): CashFlowDay {
     date: new Date(2026, 5, 15),
     projectedIncome: new Prisma.Decimal(100),
     projectedExpense: new Prisma.Decimal(40),
-    realIncome: new Prisma.Decimal(80),
-    realExpense: new Prisma.Decimal(20),
+    pendingIncome: new Prisma.Decimal(80),
+    pendingExpense: new Prisma.Decimal(20),
+    realIncome: new Prisma.Decimal(50),
+    realExpense: new Prisma.Decimal(10),
     fullProjectedIncome: new Prisma.Decimal(150),
     fullProjectedExpense: new Prisma.Decimal(60),
     netFlow: new Prisma.Decimal(120),
@@ -38,7 +40,9 @@ function day(overrides: Partial<CashFlowDay> = {}): CashFlowDay {
       Ingresos: {
         projectedIncome: new Prisma.Decimal(100),
         projectedExpense: zero(),
-        realIncome: new Prisma.Decimal(80),
+        pendingIncome: new Prisma.Decimal(80),
+        pendingExpense: zero(),
+        realIncome: new Prisma.Decimal(50),
         realExpense: zero(),
         fullProjectedIncome: new Prisma.Decimal(130),
         fullProjectedExpense: zero()
@@ -48,7 +52,9 @@ function day(overrides: Partial<CashFlowDay> = {}): CashFlowDay {
       Servicios: {
         projectedIncome: new Prisma.Decimal(100),
         projectedExpense: zero(),
-        realIncome: new Prisma.Decimal(80),
+        pendingIncome: new Prisma.Decimal(80),
+        pendingExpense: zero(),
+        realIncome: new Prisma.Decimal(50),
         realExpense: zero(),
         fullProjectedIncome: new Prisma.Decimal(130),
         fullProjectedExpense: zero()
@@ -67,6 +73,7 @@ describe("calendar view helpers", () => {
     expect(calendarMonths("12")).toBe(12);
     expect(calendarMonths("24")).toBe(3);
     expect(calendarMode("real")).toBe("real");
+    expect(calendarMode("pending")).toBe("pending");
     expect(calendarMode("comparison")).toBe("comparison");
     expect(calendarMode("bad")).toBe("projected");
   });
@@ -80,21 +87,23 @@ describe("calendar view helpers", () => {
     expect(collapsed.some((row) => row.key === "summary:balance")).toBe(true);
   });
 
-  it("calculates projected, real and comparison cell values", () => {
+  it("calculates projected, pending, real and comparison cell values", () => {
     const row = buildCalendarRows(accounts).find((item) => item.key === "category:Ingresos");
     if (!row) throw new Error("Missing row");
 
     expect(calendarCellAmount(row, day(), "projected").toString()).toBe("130");
-    expect(calendarCellAmount(row, day(), "real").toString()).toBe("80");
+    expect(calendarCellAmount(row, day(), "pending").toString()).toBe("80");
+    expect(calendarCellAmount(row, day(), "real").toString()).toBe("50");
     expect(calendarCellAmount(row, day(), "comparison").toString()).toBe("180");
   });
 
-  it("calculates net flow per mode using fullProjected/real totals", () => {
+  it("calculates net flow per mode using fullProjected/pending/real totals", () => {
     const netRow = buildCalendarRows(accounts).find((item) => item.key === "summary:net");
     if (!netRow) throw new Error("Missing row");
 
     expect(calendarCellAmount(netRow, day(), "projected").toString()).toBe("90");
-    expect(calendarCellAmount(netRow, day(), "real").toString()).toBe("60");
+    expect(calendarCellAmount(netRow, day(), "pending").toString()).toBe("60");
+    expect(calendarCellAmount(netRow, day(), "real").toString()).toBe("40");
     expect(calendarCellAmount(netRow, day(), "comparison").toString()).toBe("120");
   });
 
@@ -107,7 +116,7 @@ describe("calendar view helpers", () => {
     const realBalances = calendarAccumulatedBalances(days, "real", new Prisma.Decimal(1000));
 
     expect(calendarCellAmount(balanceRow, days[1], "projected", projectedBalances).toString()).toBe("1180");
-    expect(calendarCellAmount(balanceRow, days[1], "real", realBalances).toString()).toBe("1120");
+    expect(calendarCellAmount(balanceRow, days[1], "real", realBalances).toString()).toBe("1080");
     expect(calendarCellAmount(balanceRow, days[1], "comparison").toString()).toBe("1000");
   });
 

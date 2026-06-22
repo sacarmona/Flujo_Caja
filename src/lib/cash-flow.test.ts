@@ -53,8 +53,8 @@ describe("cash flow business-day service", () => {
     );
 
     expect(result.openingBalance.toString()).toBe("1000000");
-    expect(result.days[0].realIncome.toString()).toBe("200000");
-    expect(result.days[0].realExpense.toString()).toBe("50000");
+    expect(result.days[0].pendingIncome.toString()).toBe("200000");
+    expect(result.days[0].pendingExpense.toString()).toBe("50000");
     expect(result.days[0].netFlow.toString()).toBe("150000");
     expect(result.days[0].accumulatedBalance.toString()).toBe("1150000");
   });
@@ -196,9 +196,48 @@ describe("cash flow business-day service", () => {
     );
 
     expect(result.days[0].projectedExpense.toString()).toBe("0");
-    expect(result.days[0].realExpense.toString()).toBe("30000");
+    expect(result.days[0].pendingExpense.toString()).toBe("30000");
+    expect(result.days[0].realExpense.toString()).toBe("0");
     expect(result.days[0].fullProjectedExpense.toString()).toBe("80000");
+    expect(result.days[1].pendingExpense.toString()).toBe("50000");
     expect(result.days[1].realExpense.toString()).toBe("50000");
+  });
+
+  it("Pendiente cuenta para Modo Pendiente pero no para Modo Real (solo Parcial/Pagado)", () => {
+    const result = calculateCashFlowByBusinessDay(
+      [
+        {
+          ...baseMovement,
+          id: "pending-only",
+          type: "EXPENSE" as const,
+          status: "PENDING" as const,
+          projectedDate: date("2026-06-17"),
+          projectedAmountClp: "30000",
+          accountingAccountId: expenseAccount.id,
+          businessUnitId: unitAdmin.id,
+          accountingAccount: expenseAccount,
+          businessUnit: unitAdmin
+        },
+        {
+          ...baseMovement,
+          id: "partially-paid",
+          type: "EXPENSE" as const,
+          status: "PARTIALLY_PAID" as const,
+          projectedDate: date("2026-06-17"),
+          projectedAmountClp: "100000",
+          accountingAccountId: expenseAccount.id,
+          businessUnitId: unitAdmin.id,
+          accountingAccount: expenseAccount,
+          businessUnit: unitAdmin,
+          payments: [{ id: "pay-partial", amount: "40000", paidAt: date("2026-06-17"), currency: "CLP" as const }]
+        }
+      ],
+      openingBalances,
+      { startDate: date("2026-06-17"), endDate: date("2026-06-17") }
+    );
+
+    expect(result.days[0].pendingExpense.toString()).toBe("70000");
+    expect(result.days[0].realExpense.toString()).toBe("40000");
   });
 
   it("usa por defecto el saldo calculado entre semanas, pero respeta un saldo confirmado/actualizado a mitad de rango", () => {
@@ -307,7 +346,7 @@ describe("cash flow business-day service", () => {
       }
     });
 
-    expect(result.days[0].realIncome.toString()).toBe("90000");
+    expect(result.days[0].pendingIncome.toString()).toBe("90000");
     expect(result.days[0].realExpense.toString()).toBe("0");
   });
 
