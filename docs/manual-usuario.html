@@ -135,6 +135,7 @@ en cada vista. Un Administrador asigna y cambia el rol de cada usuario desde Con
 <tr><td>Ver y usar Recurrentes</td><td class="ok">S&iacute;</td><td class="ok">S&iacute;</td><td class="no">No</td><td class="no">No</td></tr>
 <tr><td>Crear, editar y cancelar Movimientos; registrar pagos</td><td class="ok">S&iacute;</td><td class="ok">S&iacute;</td><td class="ok">S&iacute;</td><td class="no">No</td></tr>
 <tr><td>Actualizar / confirmar Saldo inicial en Calendario</td><td class="ok">S&iacute;</td><td class="ok">S&iacute;</td><td class="no">No</td><td class="no">No</td></tr>
+<tr><td>Subir cartola y confirmar/crear en Conciliaci&oacute;n</td><td class="ok">S&iacute;</td><td class="ok">S&iacute;</td><td class="no">No</td><td class="no">No</td></tr>
 <tr><td>Crear / editar usuarios y permisos</td><td class="ok">S&iacute;</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
 <tr><td>Crear / editar el Plan de cuentas</td><td class="ok">S&iacute;</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
 </table>
@@ -317,10 +318,61 @@ errores de carga, no para anular operaciones que s&iacute; sucedieron pero no se
 <!-- ===================== 6. CONCILIACION ===================== -->
 <div class="section">
 <h2>6. Vista Conciliaci&oacute;n</h2>
-<p>Disponible para todos los roles que pueden iniciar sesi&oacute;n.</p>
-<p>Esta vista est&aacute; reservada para un m&oacute;dulo futuro, pensado para comparar los movimientos registrados en el
-sistema contra la cartola bancaria u otra fuente externa, y detectar diferencias. Actualmente no tiene
-funcionalidad activa; cuando se habilite, este manual se actualizar&aacute; con sus instrucciones.</p>
+<p><span class="role-tag">Administrador</span><span class="role-tag finance">Finanzas</span> &mdash; &Uacute;nicos roles con acceso para subir cartolas y confirmar.
+<span class="role-tag entry">Ingreso mov.</span><span class="role-tag readonly">Solo lectura</span> solo pueden ver el resultado de la &uacute;ltima cartola importada.</p>
+
+<h3>Para qu&eacute; sirve</h3>
+<p>Permite revisar la cartola bancaria de la semana en curso, confirmar de un clic los movimientos que ya
+coinciden con uno registrado en el sistema (dej&aacute;ndolo en estado "Pagado/Cobrado") y crear los que no
+existan, sin tener que revisar la cartola completa a mano.</p>
+
+<h3>Subir la cartola</h3>
+<p>Acepta dos formatos, detectados autom&aacute;ticamente al subir el archivo XLSX:</p>
+<ul>
+<li><b>Copiada/pegada</b>: la planilla que resulta de copiar los movimientos desde el portal del banco y
+pegarlos en Excel (columnas Fecha, Cargo, Abono, Descripci&oacute;n...).</li>
+<li><b>Descargada directo del banco</b>: el archivo que el banco genera para descargar (columnas Monto,
+Descripci&oacute;n movimiento, Cargo/Abono...).</li>
+</ul>
+<p>Solo se importan las filas que caen dentro de la semana en curso (lunes a domingo); las filas de semanas
+anteriores que tambi&eacute;n traiga la cartola se descartan automaticamente, ya que si el saldo inicial de la
+semana ya qued&oacute; actualizado no es necesario revisarlas de nuevo.</p>
+
+<h3>Revisar cada movimiento de la cartola</h3>
+<p>Cada fila importada se muestra con un nivel de coincidencia contra los movimientos pendientes del sistema:</p>
+<ul>
+<li><b>Coincidencia exacta</b> (fondo verde): hay un &uacute;nico movimiento con el mismo monto pendiente y la
+misma fecha proyectada. Basta presionar <b>"Confirmar Pagado/Cobrado"</b> para registrar el pago y dejarlo
+conciliado.</li>
+<li><b>Posible coincidencia</b> (fondo amarillo): el monto coincide con uno o m&aacute;s movimientos, pero ninguno
+calza exacto en fecha (o hay varios candidatos). Elige el movimiento correcto en el listado desplegable y
+presiona <b>"Conciliar con este movimiento"</b>.</li>
+<li><b>Sin coincidencia</b> (fondo gris): ning&uacute;n movimiento pendiente tiene ese monto. Completa cuenta
+contable y unidad de negocio (proyecto y centro de costo son opcionales) y presiona <b>"Crear y marcar
+Pagado/Cobrado"</b>: el sistema crea el movimiento con la fecha del banco y queda conciliado en el mismo
+paso.</li>
+</ul>
+
+<h3>Descartar o cancelar</h3>
+<ul>
+<li><b>"Descartar"</b> en una fila individual la elimina de la revisi&oacute;n sin crear ni confirmar nada (&uacute;til
+cuando esa fila no corresponde a un movimiento de la empresa, por ejemplo un cargo bancario o un error de
+la cartola).</li>
+<li><b>"Cancelar importaci&oacute;n completa"</b> descarta de una vez todas las filas pendientes de la &uacute;ltima
+cartola subida. Ninguna de las dos acciones afecta filas que ya fueron confirmadas.</li>
+</ul>
+
+<h3>Revertir una conciliaci&oacute;n ya confirmada</h3>
+<p>El listado de filas ya conciliadas o revertidas (colapsado al final de la vista) incluye un bot&oacute;n
+<b>"Revertir"</b> para cada fila confirmada: anula el pago/cobro registrado y el movimiento vuelve a su estado
+anterior. &Uacute;sala si una fila se confirm&oacute; con el movimiento equivocado.</p>
+
+<div class="box">
+<h4>Recomendaci&oacute;n</h4>
+<p>Prefiere la cartola <b>descargada directo del banco</b> cuando sea posible: es el formato m&aacute;s confiable porque
+viene generado por el banco mismo, sin riesgo de que se pierdan filas al copiar y pegar. La opci&oacute;n de copiar y
+pegar sigue siendo &uacute;til para una revisi&oacute;n r&aacute;pida cuando no se quiere descargar el archivo.</p>
+</div>
 </div>
 
 <!-- ===================== 7. BITACORA ===================== -->
