@@ -5,6 +5,7 @@ import { MovementForm } from "@/app/app/movimientos/movement-form";
 import { groupByWeek, movementInclude, statusLabels, typeLabels } from "@/app/app/movimientos/shared";
 import { WeeklyMovementsTable } from "@/app/app/movimientos/weekly-movements-table";
 import { Pagination } from "@/components/pagination";
+import { SavedBanner } from "@/components/saved-banner";
 import { calculateSantanderCashFlow } from "@/lib/cash-flow-service";
 import { weeklyAccumulatedBalances } from "@/lib/calendar-view";
 import { formatCurrency, todayInAppTimeZone } from "@/lib/format";
@@ -191,6 +192,7 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
 
   return (
     <section className="max-w-7xl">
+      <SavedBanner />
       <div className="border-b border-slate-200 pb-5">
         <h1 className="text-2xl font-semibold text-adentu-ink">Movimientos</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">

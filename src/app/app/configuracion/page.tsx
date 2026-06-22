@@ -3,6 +3,7 @@ import type React from "react";
 import { createAccountingAccountAction, updateAccountingAccountAction } from "@/app/app/configuracion/accounting-actions";
 import { createUserAction, updateUserAction } from "@/app/app/configuracion/user-actions";
 import { EmptyPage } from "@/components/empty-page";
+import { SavedBanner } from "@/components/saved-banner";
 import { buildAccountingAccountTree, type AccountingAccountNode } from "@/lib/accounting-accounts";
 import { APP_COMPANY_NAME, APP_LOCALE, APP_TIME_ZONE, BASE_CURRENCY, ROLES, ROLE_LABELS } from "@/lib/constants";
 import { getCurrentUser } from "@/lib/auth";
@@ -282,6 +283,7 @@ export default async function ConfiguracionPage() {
 
   return (
     <section className="max-w-6xl">
+      <SavedBanner />
       <div className="border-b border-slate-200 pb-5">
         <h1 className="text-2xl font-semibold text-adentu-ink">Configuracion</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">

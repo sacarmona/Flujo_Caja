@@ -5,6 +5,7 @@ import type { AccountingAccountType } from "@prisma/client";
 import { assertAdminRole, validateAccountingAccountInput } from "@/lib/accounting-accounts";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { redirectSaved } from "@/lib/saved-redirect";
 
 const accountTypes = new Set<AccountingAccountType>([
   "INCOME",
@@ -116,6 +117,7 @@ export async function createAccountingAccountAction(formData: FormData) {
 
   await writeAudit({ companyId, userId: user.id, entityId: created.id, action: "CREATE", after: created });
   revalidatePath("/app/configuracion");
+  await redirectSaved("/app/configuracion");
 }
 
 export async function updateAccountingAccountAction(formData: FormData) {
@@ -173,4 +175,5 @@ export async function updateAccountingAccountAction(formData: FormData) {
 
   await writeAudit({ companyId, userId: user.id, entityId: id, action: "UPDATE", before: current, after: updated });
   revalidatePath("/app/configuracion");
+  await redirectSaved("/app/configuracion");
 }

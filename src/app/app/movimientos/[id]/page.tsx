@@ -6,6 +6,7 @@ import { PaymentPanel } from "@/app/app/movimientos/payment-panel";
 import { formatAmount, movementInclude, optionLabel, statusLabels, typeLabels } from "@/app/app/movimientos/shared";
 import { editThisAndFollowingAction } from "@/app/app/recurrentes/actions";
 import { RecurrenceForm } from "@/app/app/recurrentes/recurrence-form";
+import { SavedBanner } from "@/components/saved-banner";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { canModifyMovements } from "@/lib/movements";
@@ -54,6 +55,7 @@ export default async function MovimientoDetailPage({ params }: { params: Promise
 
   return (
     <section className="max-w-5xl">
+      <SavedBanner />
       <Link className="text-sm font-semibold text-adentu-blue hover:underline" href="/app/movimientos">
         ← Volver a Movimientos
       </Link>

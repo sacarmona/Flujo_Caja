@@ -14,6 +14,7 @@ import {
   validatePaymentAmount
 } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
+import { redirectSaved } from "@/lib/saved-redirect";
 
 function stringValue(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -127,6 +128,7 @@ export async function createMovementAction(formData: FormData) {
     });
   }
   revalidatePath("/app/movimientos");
+  await redirectSaved("/app/movimientos");
 }
 
 export async function updateMovementAction(formData: FormData) {
@@ -178,6 +180,7 @@ export async function updateMovementAction(formData: FormData) {
     });
   }
   revalidatePath("/app/movimientos");
+  await redirectSaved("/app/movimientos");
 }
 
 export async function quickUpdateMovementAction(input: {
@@ -256,6 +259,7 @@ export async function cancelMovementAction(formData: FormData) {
     after: updated
   });
   revalidatePath("/app/movimientos");
+  await redirectSaved("/app/movimientos");
 }
 
 export async function cancelAndDeleteMovementAction(input: { id: string; reason?: string }) {
@@ -375,6 +379,7 @@ export async function registerPaymentAction(formData: FormData) {
   });
 
   revalidatePath("/app/movimientos");
+  await redirectSaved("/app/movimientos");
 }
 
 export async function cancelPaymentAction(formData: FormData) {
@@ -434,6 +439,7 @@ export async function cancelPaymentAction(formData: FormData) {
   });
 
   revalidatePath("/app/movimientos");
+  await redirectSaved("/app/movimientos");
 }
 
 export async function getMovementDefaults(companyId: string) {

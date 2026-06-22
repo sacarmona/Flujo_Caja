@@ -17,6 +17,7 @@ import type { GenerateMovementsState } from "@/lib/generate-movements-state";
 import { getCurrentUser } from "@/lib/auth";
 import { getHolidayKeys } from "@/lib/holidays-cl";
 import { prisma } from "@/lib/prisma";
+import { redirectSaved } from "@/lib/saved-redirect";
 
 function stringValue(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -109,6 +110,7 @@ export async function createRecurrenceAction(formData: FormData) {
 
   await audit({ companyId: user.companyId, userId: user.id, entityId: created.id, action: "CREATE", after: created });
   revalidatePath("/app/recurrentes");
+  await redirectSaved("/app/recurrentes");
 }
 
 async function loadImportReferenceData(companyId: string): Promise<RecurrenceImportReferenceData> {
@@ -416,6 +418,7 @@ export async function updateRecurrenceAction(formData: FormData) {
       `La regla se actualizo, pero no se pudo obtener la tasa de cambio para ${conversionErrors.length} fecha(s): ${conversionErrors.join(" | ")}. Esos movimientos quedaron sin actualizar; agrega una tasa manual a la regla y reintenta.`
     );
   }
+  await redirectSaved("/app/recurrentes");
 }
 
 /**
@@ -641,6 +644,7 @@ export async function editThisAndFollowingAction(formData: FormData) {
       `Se aplico el cambio a "esta y las siguientes ocurrencias", pero no se pudo obtener la tasa de cambio para ${conversionErrors.length} fecha(s): ${conversionErrors.join(" | ")}. Esos movimientos quedaron sin actualizar; agrega una tasa manual y reintenta.`
     );
   }
+  await redirectSaved("/app/movimientos");
 }
 
 export async function setRecurrenceActiveAction(formData: FormData) {
@@ -721,6 +725,7 @@ export async function setRecurrenceActiveAction(formData: FormData) {
   revalidatePath("/app/recurrentes");
   revalidatePath("/app/movimientos");
   revalidatePath("/app/calendario");
+  await redirectSaved("/app/recurrentes");
 }
 
 export async function generateRecurringMovementsAction(

@@ -8,6 +8,7 @@ import {
   parseOpeningBalanceDate
 } from "@/lib/opening-balances";
 import { prisma } from "@/lib/prisma";
+import { redirectSaved } from "@/lib/saved-redirect";
 
 function stringValue(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -87,6 +88,7 @@ export async function updateOpeningBalanceAction(formData: FormData) {
   });
 
   revalidatePath("/app/calendario");
+  await redirectSaved("/app/calendario");
 }
 
 /**
@@ -152,4 +154,5 @@ export async function removeOpeningBalanceAction(formData: FormData) {
   });
 
   revalidatePath("/app/calendario");
+  await redirectSaved("/app/calendario");
 }

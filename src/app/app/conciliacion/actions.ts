@@ -11,6 +11,7 @@ import { parseRequiredDate, validateMovementInput, type MovementFormInput } from
 import { nextRealDateAfterPayment, pendingBalance, statusFromPayments, validatePaymentAmount } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { assertCanManageReconciliation, matchBankRow, movementTypeForBankType, type ReconciliationCandidate } from "@/lib/reconciliation";
+import { redirectSaved } from "@/lib/saved-redirect";
 
 function stringValue(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -152,6 +153,7 @@ export async function uploadBankStatementAction(formData: FormData) {
   });
 
   revalidatePath("/app/conciliacion");
+  await redirectSaved("/app/conciliacion");
 }
 
 async function registerReconciliationPayment(params: {
@@ -239,6 +241,7 @@ export async function confirmReconciliationAction(formData: FormData) {
 
   revalidatePath("/app/conciliacion");
   revalidatePath("/app/movimientos");
+  await redirectSaved("/app/conciliacion");
 }
 
 export async function createMovementFromBankRowAction(formData: FormData) {
@@ -332,6 +335,7 @@ export async function createMovementFromBankRowAction(formData: FormData) {
 
   revalidatePath("/app/conciliacion");
   revalidatePath("/app/movimientos");
+  await redirectSaved("/app/conciliacion");
 }
 
 export async function reverseReconciliationAction(formData: FormData) {
@@ -370,6 +374,7 @@ export async function reverseReconciliationAction(formData: FormData) {
 
   revalidatePath("/app/conciliacion");
   revalidatePath("/app/movimientos");
+  await redirectSaved("/app/conciliacion");
 }
 
 /**
@@ -420,6 +425,7 @@ export async function discardBankMovementAction(formData: FormData) {
   });
 
   revalidatePath("/app/conciliacion");
+  await redirectSaved("/app/conciliacion");
 }
 
 export async function cancelImportBatchAction(formData: FormData) {
@@ -447,4 +453,5 @@ export async function cancelImportBatchAction(formData: FormData) {
   });
 
   revalidatePath("/app/conciliacion");
+  await redirectSaved("/app/conciliacion");
 }

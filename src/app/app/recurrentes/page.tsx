@@ -6,6 +6,7 @@ import { RecurrenceForm } from "@/app/app/recurrentes/recurrence-form";
 import { RecurrenceImportForm } from "@/app/app/recurrentes/recurrence-import-form";
 import { typeLabels } from "@/app/app/movimientos/shared";
 import { Pagination } from "@/components/pagination";
+import { SavedBanner } from "@/components/saved-banner";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { canManageRecurrences, generatedMovementLink, previewRecurrence, recurrenceFrequencies } from "@/lib/recurrence-rules";
@@ -127,6 +128,7 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
 
   return (
     <section className="max-w-7xl">
+      <SavedBanner />
       <div className="border-b border-slate-200 pb-5">
         <h1 className="text-2xl font-semibold text-adentu-ink">Recurrentes</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">

@@ -16,6 +16,7 @@ import {
   type CalendarMode
 } from "@/lib/calendar-view";
 import { dateKey } from "@/lib/recurrences";
+import { SavedBanner } from "@/components/saved-banner";
 import { formatCurrency, todayInAppTimeZone } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { getHolidayKeys } from "@/lib/holidays-cl";
@@ -186,6 +187,7 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
 
   return (
     <section className="max-w-none">
+      <SavedBanner />
       <div className="border-b border-slate-200 pb-5">
         <h1 className="text-2xl font-semibold text-adentu-ink">Calendario</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">

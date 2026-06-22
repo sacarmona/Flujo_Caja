@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { assertCanChangeOwnRole, assertCanManageUsers, parseRole, validateEmail, validatePassword } from "@/lib/users";
+import { redirectSaved } from "@/lib/saved-redirect";
 
 const passwordHashCost = 10;
 
@@ -74,6 +75,7 @@ export async function createUserAction(formData: FormData) {
     after: auditSafeUser(created)
   });
   revalidatePath("/app/configuracion");
+  await redirectSaved("/app/configuracion");
 }
 
 export async function updateUserAction(formData: FormData) {
@@ -119,4 +121,5 @@ export async function updateUserAction(formData: FormData) {
     after: auditSafeUser(updated)
   });
   revalidatePath("/app/configuracion");
+  await redirectSaved("/app/configuracion");
 }
