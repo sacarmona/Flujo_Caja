@@ -1,7 +1,7 @@
-import Link from "next/link";
 import type { AuditAction } from "@prisma/client";
 import { auditActionLabels, movementAuditSummary } from "@/lib/audit-log";
 import { typeLabels } from "@/app/app/movimientos/shared";
+import { Pagination } from "@/components/pagination";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -150,22 +150,11 @@ export default async function BitacoraPage({ searchParams }: BitacoraPageProps) 
         ) : null}
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-500">
           {result.total} registros · Pagina {result.page} de {result.pages}
         </p>
-        <div className="flex justify-end gap-2">
-          {result.page > 1 ? (
-            <Link className="rounded-md border border-slate-300 px-3 py-2 text-sm" href={pageHref(result.page - 1, filters)}>
-              Anterior
-            </Link>
-          ) : null}
-          {result.page < result.pages ? (
-            <Link className="rounded-md border border-slate-300 px-3 py-2 text-sm" href={pageHref(result.page + 1, filters)}>
-              Siguiente
-            </Link>
-          ) : null}
-        </div>
+        <Pagination buildHref={(page) => pageHref(page, filters)} page={result.page} pages={result.pages} />
       </div>
     </section>
   );

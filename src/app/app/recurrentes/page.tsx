@@ -5,6 +5,7 @@ import { GenerateMovementsButton } from "@/app/app/recurrentes/generate-movement
 import { RecurrenceForm } from "@/app/app/recurrentes/recurrence-form";
 import { RecurrenceImportForm } from "@/app/app/recurrentes/recurrence-import-form";
 import { typeLabels } from "@/app/app/movimientos/shared";
+import { Pagination } from "@/components/pagination";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { canManageRecurrences, generatedMovementLink, previewRecurrence, recurrenceFrequencies } from "@/lib/recurrence-rules";
@@ -328,17 +329,8 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
           </div>
         ) : null}
 
-        <div className="flex justify-end gap-2">
-          {result.page > 1 ? (
-            <Link className="rounded-md border border-slate-300 px-3 py-2 text-sm" href={pageHref(result.page - 1, filters)}>
-              Anterior
-            </Link>
-          ) : null}
-          {result.page < result.pages ? (
-            <Link className="rounded-md border border-slate-300 px-3 py-2 text-sm" href={pageHref(result.page + 1, filters)}>
-              Siguiente
-            </Link>
-          ) : null}
+        <div className="flex justify-end">
+          <Pagination buildHref={(page) => pageHref(page, filters)} page={result.page} pages={result.pages} />
         </div>
       </div>
     </section>
