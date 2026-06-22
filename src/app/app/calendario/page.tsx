@@ -298,7 +298,6 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
             <div>
               <h2 className="text-xs font-semibold text-slate-600">Saldo diario actual ({dateLabel(currentDay.date)})</h2>
               <p className="text-xl font-semibold text-adentu-teal">{formatCurrency(Number(currentRealBalance))}</p>
-              <p className="text-[11px] text-slate-500">Solo Parcial y Pagado/Cobrado (Modo Real)</p>
             </div>
           </>
         ) : null}
