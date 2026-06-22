@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { AuditAction } from "@prisma/client";
 import { auditActionLabels, movementAuditSummary } from "@/lib/audit-log";
 import { typeLabels } from "@/app/app/movimientos/shared";
-import { formatCurrency, formatDateTime } from "@/lib/format";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -118,6 +118,7 @@ export default async function BitacoraPage({ searchParams }: BitacoraPageProps) 
               <th className="px-3 py-2 text-left font-semibold text-adentu-ink">Usuario</th>
               <th className="px-3 py-2 text-left font-semibold text-adentu-ink">Accion</th>
               <th className="px-3 py-2 text-left font-semibold text-adentu-ink">Movimiento</th>
+              <th className="px-3 py-2 text-left font-semibold text-adentu-ink">Fecha movimiento</th>
               <th className="px-3 py-2 text-right font-semibold text-adentu-ink">Monto</th>
             </tr>
           </thead>
@@ -135,6 +136,7 @@ export default async function BitacoraPage({ searchParams }: BitacoraPageProps) 
                     {summary.type ? `${typeLabels[summary.type as keyof typeof typeLabels] ?? summary.type} · ` : ""}
                     {summary.description}
                   </td>
+                  <td className="px-3 py-2 text-left text-slate-600">{summary.projectedDate ? formatDate(summary.projectedDate) : "-"}</td>
                   <td className="px-3 py-2 text-right font-medium text-adentu-ink">
                     {summary.amount !== null ? formatCurrency(summary.amount) : "-"}
                   </td>
