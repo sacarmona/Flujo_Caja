@@ -155,11 +155,11 @@ describe("cash flow business-day service", () => {
       { startDate: date("2026-06-17"), endDate: date("2026-06-18") }
     );
 
-    // El pago se registra en la fecha real (18), pero el fullProjected del
-    // monto pagado se queda en la fecha proyectada original (17), porque
-    // representa el plan original, no lo efectivamente cobrado/pagado.
-    expect(result.days[0].fullProjectedExpense.toString()).toBe("30000");
-    expect(result.days[1].fullProjectedExpense.toString()).toBe("0");
+    // El Vencido (sin pago) se queda en su fecha proyectada (17). El
+    // Pagado/Cobrado mueve su monto de fullProjected a la fecha del pago
+    // (18), igual que Real, para que ambos modos coincidan en lo ya resuelto.
+    expect(result.days[0].fullProjectedExpense.toString()).toBe("10000");
+    expect(result.days[1].fullProjectedExpense.toString()).toBe("20000");
   });
 
   it("counts Pendiente movements without payment as real, using el monto y fecha proyectados", () => {
@@ -198,9 +198,39 @@ describe("cash flow business-day service", () => {
     expect(result.days[0].projectedExpense.toString()).toBe("0");
     expect(result.days[0].pendingExpense.toString()).toBe("30000");
     expect(result.days[0].realExpense.toString()).toBe("0");
-    expect(result.days[0].fullProjectedExpense.toString()).toBe("80000");
+    expect(result.days[0].fullProjectedExpense.toString()).toBe("30000");
     expect(result.days[1].pendingExpense.toString()).toBe("50000");
     expect(result.days[1].realExpense.toString()).toBe("50000");
+    expect(result.days[1].fullProjectedExpense.toString()).toBe("50000");
+  });
+
+  it("Pagado/Cobrado mueve su monto de fullProjected a la fecha del pago para coincidir con Real", () => {
+    const result = calculateCashFlowByBusinessDay(
+      [
+        {
+          ...baseMovement,
+          id: "paid-late",
+          type: "EXPENSE" as const,
+          status: "PAID_OR_COLLECTED" as const,
+          projectedDate: date("2026-06-17"),
+          projectedAmountClp: "200000",
+          accountingAccountId: expenseAccount.id,
+          businessUnitId: unitAdmin.id,
+          accountingAccount: expenseAccount,
+          businessUnit: unitAdmin,
+          payments: [{ id: "pay-late", amount: "200000", paidAt: date("2026-06-22"), currency: "CLP" as const }]
+        }
+      ],
+      openingBalances,
+      { startDate: date("2026-06-17"), endDate: date("2026-06-22") }
+    );
+
+    const projectedDay = result.days.find((day) => day.date.getDate() === 17);
+    const paidDay = result.days.find((day) => day.date.getDate() === 22);
+
+    expect(projectedDay?.fullProjectedExpense.toString()).toBe("0");
+    expect(paidDay?.fullProjectedExpense.toString()).toBe("200000");
+    expect(paidDay?.realExpense.toString()).toBe("200000");
   });
 
   it("Pendiente cuenta para Modo Pendiente pero no para Modo Real (solo Parcial/Pagado)", () => {

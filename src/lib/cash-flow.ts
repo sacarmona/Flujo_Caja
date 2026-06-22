@@ -305,16 +305,31 @@ export function calculateCashFlowByBusinessDay(
 
     const projectedDate = moveToNextBusinessDay(movement.projectedDate, holidaySet);
     const projectedDay = dayByKey.get(dateKey(projectedDate));
-    if (projectedDay) {
+    const active = movement.payments.filter((payment) => !payment.deletedAt && !payment.cancelledAt);
+
+    /**
+     * Pagado/Cobrado: el monto del pronostico completo (fullProjected) se
+     * ubica en la fecha de pago/conciliacion, igual que Real, para que
+     * Proyectado coincida exactamente con Real en los movimientos ya
+     * resueltos. El resto de los estados (Proyectado, Pendiente, Parcial,
+     * Vencido) sigue usando la fecha y monto proyectados originales, ya que
+     * todavia no hay un pago real que represente mejor cuando se movera el
+     * dinero.
+     */
+    if (movement.status === "PAID_OR_COLLECTED" && active.length > 0) {
+      for (const payment of active) {
+        const day = dayByKey.get(dateKey(moveToNextBusinessDay(payment.paidAt, holidaySet)));
+        if (day) {
+          addFullProjectedEntry(day, movement, decimal(payment.amount));
+        }
+      }
+    } else if (projectedDay) {
       addFullProjectedEntry(projectedDay, movement, decimal(movement.projectedAmountClp));
     }
 
-    const active = movement.payments.filter((payment) => !payment.deletedAt && !payment.cancelledAt);
-
     if (active.length > 0) {
       for (const payment of active) {
-        const paymentDate = moveToNextBusinessDay(payment.paidAt, holidaySet);
-        const day = dayByKey.get(dateKey(paymentDate));
+        const day = dayByKey.get(dateKey(moveToNextBusinessDay(payment.paidAt, holidaySet)));
         if (day) {
           addEntry(day, movement, decimal(payment.amount), movement.status);
         }
