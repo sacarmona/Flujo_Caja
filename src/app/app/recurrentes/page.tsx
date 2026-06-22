@@ -31,6 +31,7 @@ const frequencyLabels: Record<RecurrenceFrequency, string> = {
 
 type SearchParams = {
   page?: string;
+  q?: string;
   state?: "active" | "inactive";
   frequency?: RecurrenceFrequency;
   accountingAccountId?: string;
@@ -73,6 +74,7 @@ async function getRecurrences(companyId: string, filters: SearchParams) {
   const page = Math.max(Number(filters.page ?? 1) || 1, 1);
   const where = {
     companyId,
+    ...(filters.q?.trim() ? { description: { contains: filters.q.trim(), mode: "insensitive" as const } } : {}),
     ...(filters.state === "active" ? { isActive: true } : {}),
     ...(filters.state === "inactive" ? { isActive: false } : {}),
     ...(filters.frequency ? { frequency: filters.frequency } : {}),
@@ -136,7 +138,17 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
         </p>
       </div>
 
-      <form className="mt-6 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-6">
+      <form className="mt-6 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-7">
+        <label className="text-sm">
+          <span className="mb-1 block text-slate-600">Buscar</span>
+          <input
+            className="w-full rounded-md border border-slate-300 px-2 py-2"
+            type="search"
+            name="q"
+            placeholder="Descripcion..."
+            defaultValue={filters.q ?? ""}
+          />
+        </label>
         <label className="text-sm">
           <span className="mb-1 block text-slate-600">Estado</span>
           <select className="w-full rounded-md border border-slate-300 px-2 py-2" name="state" defaultValue={filters.state ?? ""}>
