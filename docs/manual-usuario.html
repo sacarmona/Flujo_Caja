@@ -98,6 +98,17 @@ respaldo auditable de cada cambio.</p>
 <p>La aplicaci&oacute;n se organiza en seis vistas, accesibles desde el men&uacute; lateral: <b>Recurrentes</b>,
 <b>Calendario</b>, <b>Movimientos</b>, <b>Conciliaci&oacute;n</b>, <b>Bit&aacute;cora</b> y <b>Configuraci&oacute;n</b>.</p>
 
+<div class="box warn">
+<h4>Esperar la confirmaci&oacute;n antes de salir o navegar a otra vista</h4>
+<p>Despu&eacute;s de presionar <b>Guardar</b>, <b>Crear</b> o cualquier bot&oacute;n equivalente en un formulario
+(Movimientos, Recurrentes, Conciliaci&oacute;n, Saldo inicial en Calendario o Configuraci&oacute;n), la pantalla
+muestra un aviso verde <b>&ldquo;Cambios guardados correctamente&rdquo;</b> en la parte superior. Ese aviso confirma
+que el cambio qued&oacute; grabado en el sistema.</p>
+<p>Hay que esperar a ver ese aviso antes de cerrar la pesta&ntilde;a, navegar a otra vista o volver a hacer clic en
+Guardar. Si se sale de la pantalla o se navega a otra vista antes de que aparezca la confirmaci&oacute;n, no hay
+garant&iacute;a de que el cambio se haya guardado, y puede ser necesario repetir la acci&oacute;n.</p>
+</div>
+
 <h3>Roles disponibles</h3>
 <p>Cada usuario tiene asignado uno de cuatro roles. El rol determina qu&eacute; puede ver y qu&eacute; puede modificar
 en cada vista. Un Administrador asigna y cambia el rol de cada usuario desde Configuraci&oacute;n &rarr; Usuarios.</p>
@@ -186,7 +197,9 @@ d&iacute;a del mes, o d&iacute;a de la semana).</li>
 <h4>Recomendaci&oacute;n</h4>
 <p>Antes de guardar, revisa el bloque de <b>vista previa</b> que muestra las pr&oacute;ximas ocurrencias calculadas.
 Si una fecha cae en fin de semana o feriado, el sistema la mueve autom&aacute;ticamente al d&iacute;a h&aacute;bil m&aacute;s
-cercano e indica "(movida desde DD/MM/AAAA)" &mdash; esto es normal y evita movimientos en d&iacute;as no h&aacute;biles.</p>
+cercano e indica "(movida desde DD/MM/AAAA)" &mdash; esto es normal y evita movimientos en d&iacute;as no h&aacute;biles.
+Despu&eacute;s de presionar Crear o Guardar, espera el aviso verde de confirmaci&oacute;n antes de salir de la
+pantalla (ver secci&oacute;n 1).</p>
 </div>
 
 <h3>Editar y generar movimientos</h3>
@@ -252,6 +265,8 @@ lo que el sistema proyect&oacute;, o ingresa el monto real en el campo <b>"Nuevo
 acumulado a partir del nuevo valor &mdash; hazlo regularmente (al menos una vez por semana) para que la
 proyecci&oacute;n no se desv&iacute;e del saldo real del banco.</li>
 <li>Si necesitas revertir una confirmaci&oacute;n hecha por error, usa "Quitar saldo confirmado" en esa semana.</li>
+<li>Tras presionar "Confirmar calculado", "Actualizar" o "Quitar saldo confirmado", espera el aviso verde de
+confirmaci&oacute;n antes de navegar a otra vista (ver secci&oacute;n 1).</li>
 </ul>
 </div>
 <p>Esta vista requiere que exista una cuenta bancaria llamada "Cuenta Corriente Santander" en el sistema; si no
@@ -277,12 +292,15 @@ semana muestra el saldo acumulado a esa fecha (mismo c&aacute;lculo que en Calen
 <h3>Edici&oacute;n r&aacute;pida desde el listado</h3>
 <p>Directamente en la tabla, sin abrir el detalle, se puede editar la <b>fecha</b>, el <b>monto</b> y el <b>estado</b>
 de un movimiento (excepto pasarlo a "Cancelado", que requiere el detalle). Los cambios se guardan al salir del
-campo (perder el foco).</p>
+campo (perder el foco); mientras se guarda, el campo queda deshabilitado y si algo falla aparece un mensaje de
+error bajo la fila &mdash; no usa el aviso verde de confirmaci&oacute;n de la secci&oacute;n 1, porque la propia fila ya
+indica si el guardado est&aacute; en curso o fall&oacute;.</p>
 
 <h3>Crear un movimiento</h3>
 <p>Formulario colapsable "Crear movimiento", con los mismos campos que una recurrencia individual: tipo, cuenta
 contable, descripci&oacute;n, monto, moneda (con tasa manual opcional si no es CLP), cuenta bancaria, unidad de
-negocio, proyecto y centro de costo opcionales, fecha proyectada, fecha real opcional, estado inicial y notas.</p>
+negocio, proyecto y centro de costo opcionales, fecha proyectada, fecha real opcional, estado inicial y notas.
+Tras presionar Crear, espera el aviso verde de confirmaci&oacute;n antes de navegar a otra vista (ver secci&oacute;n 1).</p>
 
 <h3>Detalle de un movimiento (bot&oacute;n "Ver")</h3>
 <p>Muestra toda la informaci&oacute;n del movimiento, su tasa de cambio aplicada (autom&aacute;tica o manual con motivo),
@@ -312,6 +330,8 @@ registrados, no tiene conciliaciones asociadas y no est&aacute; ya pagado/cobrad
 <p>Prefiere "Cancelar sin borrar" frente a "Borrar" salvo que el movimiento se haya creado por error real (ej.
 duplicado, datos de prueba). Cancelar preserva la trazabilidad en la Bit&aacute;cora; borrar es para limpieza de
 errores de carga, no para anular operaciones que s&iacute; sucedieron pero no se concretar&aacute;n.</p>
+<p>En el detalle del movimiento, despu&eacute;s de Guardar, Registrar pago/cobro, Cancelar sin borrar o anular un
+pago, espera el aviso verde de confirmaci&oacute;n antes de salir de la pantalla (ver secci&oacute;n 1).</p>
 </div>
 </div>
 
@@ -372,6 +392,8 @@ anterior. &Uacute;sala si una fila se confirm&oacute; con el movimiento equivoca
 <p>Prefiere la cartola <b>descargada directo del banco</b> cuando sea posible: es el formato m&aacute;s confiable porque
 viene generado por el banco mismo, sin riesgo de que se pierdan filas al copiar y pegar. La opci&oacute;n de copiar y
 pegar sigue siendo &uacute;til para una revisi&oacute;n r&aacute;pida cuando no se quiere descargar el archivo.</p>
+<p>Tras subir la cartola, confirmar/crear una fila, descartar, cancelar la importaci&oacute;n completa o revertir,
+espera el aviso verde de confirmaci&oacute;n antes de navegar a otra vista (ver secci&oacute;n 1).</p>
 </div>
 </div>
 
@@ -423,6 +445,9 @@ el &uacute;nico rol capaz de revertir ese cambio. Si necesitas cambiar el rol de
 Administrador debe hacerlo por ti.</p>
 </div>
 
+<p>Tras crear o editar un usuario, espera el aviso verde de confirmaci&oacute;n antes de navegar a otra vista
+(ver secci&oacute;n 1).</p>
+
 <h3>8.3 Plan de cuentas</h3>
 <p><span class="role-tag">Administrador</span> &mdash; &Uacute;nico rol que puede crear o editar cuentas. El resto de los
 roles puede verlo en modo solo lectura.</p>
@@ -445,6 +470,8 @@ movimientos, pero impide usarla en nuevos registros.</li>
 <p>Evita reorganizar el plan de cuentas con frecuencia una vez que ya hay movimientos cargados: cambiar el tipo
 o la jerarqu&iacute;a de una cuenta usada afecta c&oacute;mo se ve&iacute;a hist&oacute;ricamente el flujo de caja en Calendario.
 Prefiere crear una cuenta nueva y desactivar la antigua si necesitas reclasificar algo de forma permanente.</p>
+<p>Tras crear o editar una cuenta contable, espera el aviso verde de confirmaci&oacute;n antes de navegar a otra
+vista (ver secci&oacute;n 1).</p>
 </div>
 </div>
 
