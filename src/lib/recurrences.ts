@@ -167,8 +167,3 @@ export function deactivateRecurrence<T extends { isActive: boolean; deactivatedA
   return { ...recurrence, isActive: false, deactivatedAt: at };
 }
 
-export const recurrenceEditScopes = ["THIS_OCCURRENCE", "THIS_AND_FOLLOWING"] as const;
-
-export function isFutureScopePrepared(scope: (typeof recurrenceEditScopes)[number]): boolean {
-  return scope === "THIS_AND_FOLLOWING";
-}

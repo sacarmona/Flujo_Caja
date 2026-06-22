@@ -418,6 +418,231 @@ export async function updateRecurrenceAction(formData: FormData) {
   }
 }
 
+/**
+ * "Esta y las siguientes ocurrencias" (THIS_AND_FOLLOWING): divide la regla
+ * en dos en la fecha de inicio enviada por el formulario (la pagina de
+ * detalle de movimiento la precarga con la fecha de la ocurrencia que se
+ * esta editando). La regla original queda intacta para todo lo anterior a
+ * esa fecha (su `endDate` se recorta al dia previo); una regla nueva, con
+ * los datos editados, toma el resto del horizonte. Las ocurrencias futuras
+ * ya pagadas o con pago parcial (shouldPreserveRecurrenceMovement) se dejan
+ * sin tocar, igual que en la edicion completa de la regla.
+ */
+export async function editThisAndFollowingAction(formData: FormData) {
+  const user = await requireRecurrenceManager();
+  const id = stringValue(formData, "id");
+  const current = await prisma.recurrenceRule.findFirst({ where: { id, companyId: user.companyId } });
+  if (!current) {
+    throw new Error("La recurrencia no existe.");
+  }
+
+  const input = formInput(formData);
+  const data = validateRecurrenceInput(input, await references(user.companyId, input));
+  const splitDate = data.startDate;
+
+  if (splitDate.getTime() <= current.startDate.getTime()) {
+    // No queda ningun periodo "anterior" que preservar: equivale a editar toda la regla.
+    return updateRecurrenceAction(formData);
+  }
+
+  const holidays = await getHolidayKeys(prisma);
+
+  await prisma.movement.updateMany({
+    where: { recurrenceRuleId: id, deletedAt: { not: null }, recurrenceOccurrenceDate: { not: null, gte: splitDate } },
+    data: { recurrenceOccurrenceDate: null }
+  });
+
+  const futureMovements = await prisma.movement.findMany({
+    where: { companyId: user.companyId, recurrenceRuleId: id, deletedAt: null, recurrenceOccurrenceDate: { gte: splitDate } },
+    orderBy: [{ recurrenceOccurrenceDate: "asc" }]
+  });
+  const preservedKeys = futureMovements
+    .filter((movement) => shouldPreserveRecurrenceMovement(movement.status))
+    .map((movement) => movement.recurrenceOccurrenceDate)
+    .filter((date): date is Date => Boolean(date))
+    .map(dateKey);
+  const rewriteMovements = futureMovements.filter((movement) => shouldRewriteRecurrenceMovement(movement.status));
+  const occurrences = generateRecurrenceOccurrences(
+    {
+      frequency: data.frequency,
+      intervalDays: data.intervalDays,
+      dayOfMonth: data.dayOfMonth,
+      dayOfWeek: data.dayOfWeek,
+      startDate: splitDate,
+      endDate: data.endDate
+    },
+    { holidays, months: 12, existingOccurrenceKeys: preservedKeys }
+  );
+
+  const provider = new CachedHttpExchangeRateProvider(prisma, user.companyId);
+  const conversionsByMovementId = new Map<string, Awaited<ReturnType<typeof resolveConversionAllowManualFallback>>>();
+  const conversionErrors: string[] = [];
+
+  for (const [index, movement] of rewriteMovements.entries()) {
+    const occurrence = occurrences[index];
+    if (!occurrence) {
+      continue;
+    }
+
+    try {
+      const conversion = await resolveConversionAllowManualFallback({
+        amount: data.amount,
+        currency: data.currency,
+        date: occurrence.projectedDate,
+        provider,
+        manualRate: data.manualRate?.toString() ?? null,
+        manualReason: data.manualRateReason,
+        preferAutomatic: true
+      });
+      conversionsByMovementId.set(movement.id, conversion);
+    } catch (error) {
+      conversionErrors.push(`${dateKey(occurrence.projectedDate)}: ${error instanceof Error ? error.message : "error desconocido"}`);
+    }
+  }
+
+  const trimmedOldEndDate = new Date(splitDate.getTime() - 24 * 60 * 60 * 1000);
+
+  await prisma.$transaction(async (tx) => {
+    const trimmedOld = await tx.recurrenceRule.update({
+      where: { id },
+      data: { endDate: trimmedOldEndDate, nextEditScope: "THIS_AND_FOLLOWING" }
+    });
+    await tx.auditLog.create({
+      data: {
+        companyId: user.companyId,
+        userId: user.id,
+        entity: "RecurrenceRule",
+        entityId: id,
+        action: "UPDATE",
+        before: JSON.parse(JSON.stringify(current)),
+        after: JSON.parse(JSON.stringify(trimmedOld)),
+        metadata: { source: "this-and-following-split", role: "predecessor" }
+      }
+    });
+
+    const newRule = await tx.recurrenceRule.create({
+      data: {
+        companyId: user.companyId,
+        businessUnitId: data.businessUnitId,
+        accountingAccountId: data.accountingAccountId,
+        bankAccountId: data.bankAccountId,
+        projectId: data.projectId,
+        costCenterId: data.costCenterId,
+        type: data.type,
+        description: data.description,
+        amount: data.amount,
+        currency: data.currency,
+        manualRate: data.manualRate,
+        manualRateReason: data.manualRateReason,
+        frequency: data.frequency,
+        intervalDays: data.intervalDays,
+        dayOfMonth: data.dayOfMonth,
+        dayOfWeek: data.dayOfWeek,
+        startDate: splitDate,
+        endDate: data.endDate,
+        status: data.status,
+        notes: data.notes,
+        isActive: current.isActive
+      }
+    });
+    await tx.auditLog.create({
+      data: {
+        companyId: user.companyId,
+        userId: user.id,
+        entity: "RecurrenceRule",
+        entityId: newRule.id,
+        action: "CREATE",
+        after: JSON.parse(JSON.stringify(newRule)),
+        metadata: { source: "this-and-following-split", predecessorRuleId: id }
+      }
+    });
+
+    if (rewriteMovements.length > 0) {
+      await tx.movement.updateMany({
+        where: { id: { in: rewriteMovements.map((movement) => movement.id) } },
+        data: { recurrenceOccurrenceDate: null }
+      });
+    }
+
+    for (const [index, movement] of rewriteMovements.entries()) {
+      const occurrence = occurrences[index];
+
+      if (!occurrence) {
+        const updatedMovement = await tx.movement.update({
+          where: { id: movement.id },
+          data: {
+            deletedAt: new Date(),
+            notes: movement.notes ?? "Eliminado por cambio de recurrencia (esta y las siguientes)."
+          }
+        });
+        await tx.auditLog.create({
+          data: {
+            companyId: user.companyId,
+            userId: user.id,
+            entity: "Movement",
+            entityId: movement.id,
+            action: "SOFT_DELETE",
+            before: JSON.parse(JSON.stringify(movement)),
+            after: JSON.parse(JSON.stringify(updatedMovement)),
+            metadata: { source: "this-and-following-split", recurrenceRuleId: newRule.id, predecessorRuleId: id }
+          }
+        });
+        continue;
+      }
+
+      const conversion = conversionsByMovementId.get(movement.id);
+      if (!conversion) {
+        // Sin tasa disponible para esta fecha (ver conversionErrors); se deja el movimiento sin tocar.
+        continue;
+      }
+
+      const updatedMovement = await tx.movement.update({
+        where: { id: movement.id },
+        data: {
+          recurrenceRuleId: newRule.id,
+          recurrenceOccurrenceDate: occurrence.occurrenceDate,
+          businessUnitId: newRule.businessUnitId,
+          accountingAccountId: newRule.accountingAccountId,
+          bankAccountId: newRule.bankAccountId,
+          projectId: newRule.projectId,
+          costCenterId: newRule.costCenterId,
+          type: newRule.type,
+          status: newRule.status,
+          description: newRule.description,
+          amount: newRule.amount,
+          currency: newRule.currency,
+          projectedDate: occurrence.projectedDate,
+          realDate: null,
+          notes: newRule.notes,
+          ...conversion
+        }
+      });
+      await tx.auditLog.create({
+        data: {
+          companyId: user.companyId,
+          userId: user.id,
+          entity: "Movement",
+          entityId: movement.id,
+          action: "UPDATE",
+          before: JSON.parse(JSON.stringify(movement)),
+          after: JSON.parse(JSON.stringify(updatedMovement)),
+          metadata: { source: "this-and-following-split", recurrenceRuleId: newRule.id, predecessorRuleId: id }
+        }
+      });
+    }
+  });
+
+  revalidatePath("/app/recurrentes");
+  revalidatePath("/app/movimientos");
+  revalidatePath("/app/calendario");
+
+  if (conversionErrors.length > 0) {
+    throw new Error(
+      `Se aplico el cambio a "esta y las siguientes ocurrencias", pero no se pudo obtener la tasa de cambio para ${conversionErrors.length} fecha(s): ${conversionErrors.join(" | ")}. Esos movimientos quedaron sin actualizar; agrega una tasa manual y reintenta.`
+    );
+  }
+}
+
 export async function setRecurrenceActiveAction(formData: FormData) {
   const user = await requireRecurrenceManager();
   const id = stringValue(formData, "id");

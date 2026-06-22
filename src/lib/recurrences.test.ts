@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  dateKey,
-  deactivateRecurrence,
-  generateRecurrenceOccurrences,
-  isFutureScopePrepared
-} from "./recurrences";
+import { dateKey, deactivateRecurrence, generateRecurrenceOccurrences } from "./recurrences";
 
 function keys(dates: ReturnType<typeof generateRecurrenceOccurrences>) {
   return dates.map((item) => dateKey(item.projectedDate));
@@ -122,12 +117,11 @@ describe("recurrence engine", () => {
     expect(keys(occurrences)).toEqual(["2026-06-22"]);
   });
 
-  it("deactivates recurrence without deleting history and prepares future edit scope", () => {
+  it("deactivates recurrence without deleting history", () => {
     const recurrence: { isActive: boolean; deactivatedAt: Date | null } = { isActive: true, deactivatedAt: null };
     const deactivated = deactivateRecurrence(recurrence, new Date("2026-06-18T00:00:00.000Z"));
 
     expect(deactivated.isActive).toBe(false);
     expect(deactivated.deactivatedAt?.getFullYear()).toBe(2026);
-    expect(isFutureScopePrepared("THIS_AND_FOLLOWING")).toBe(true);
   });
 });

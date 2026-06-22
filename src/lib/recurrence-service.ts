@@ -138,24 +138,3 @@ export async function deactivateRecurrenceRule(ruleId: string, prisma: PrismaCli
   });
 }
 
-export async function editSingleOccurrence(
-  movementId: string,
-  prisma: PrismaClient,
-  data: {
-    description?: string;
-    projectedDate?: Date;
-    notes?: string | null;
-  }
-) {
-  return prisma.movement.update({
-    where: { id: movementId },
-    data
-  });
-}
-
-export function prepareThisAndFollowingScope() {
-  return {
-    scope: "THIS_AND_FOLLOWING" as const,
-    implemented: false
-  };
-}

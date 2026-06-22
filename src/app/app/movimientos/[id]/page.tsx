@@ -4,9 +4,12 @@ import { cancelMovementAction, getMovementDefaults, updateMovementAction } from 
 import { MovementForm } from "@/app/app/movimientos/movement-form";
 import { PaymentPanel } from "@/app/app/movimientos/payment-panel";
 import { formatAmount, movementInclude, optionLabel, statusLabels, typeLabels } from "@/app/app/movimientos/shared";
+import { editThisAndFollowingAction } from "@/app/app/recurrentes/actions";
+import { RecurrenceForm } from "@/app/app/recurrentes/recurrence-form";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { canModifyMovements } from "@/lib/movements";
+import { canManageRecurrences } from "@/lib/recurrence-rules";
 import { prisma } from "@/lib/prisma";
 
 async function getReferenceData(companyId: string) {
@@ -43,6 +46,11 @@ export default async function MovimientoDetailPage({ params }: { params: Promise
 
   const [referenceData, defaults] = await Promise.all([getReferenceData(user.companyId), getMovementDefaults(user.companyId)]);
   const canWrite = canModifyMovements(user.role);
+  const canManageRecurrence = canManageRecurrences(user.role);
+  const recurrenceRule =
+    canManageRecurrence && movement.recurrenceRuleId && movement.recurrenceOccurrenceDate
+      ? await prisma.recurrenceRule.findFirst({ where: { id: movement.recurrenceRuleId, companyId: user.companyId } })
+      : null;
 
   return (
     <section className="max-w-5xl">
@@ -103,6 +111,24 @@ export default async function MovimientoDetailPage({ params }: { params: Promise
                 Cancelar sin borrar
               </button>
             </form>
+          </div>
+        ) : null}
+
+        {recurrenceRule ? (
+          <div className="mt-6 border-t border-slate-200 pt-4">
+            <h2 className="mb-1 text-sm font-semibold text-adentu-ink">Editar esta y las siguientes ocurrencias</h2>
+            <p className="mb-3 text-xs text-slate-500">
+              Aplica estos cambios desde la fecha de &quot;Inicio&quot; en adelante (precargada con la fecha de esta ocurrencia,{" "}
+              {formatDate(movement.projectedDate)}), sin modificar las ocurrencias anteriores ya generadas. Las ocurrencias futuras ya pagadas o con
+              pago parcial no se tocan.
+            </p>
+            <RecurrenceForm
+              action={editThisAndFollowingAction}
+              defaults={defaults}
+              recurrence={{ ...recurrenceRule, startDate: movement.recurrenceOccurrenceDate ?? recurrenceRule.startDate }}
+              referenceData={referenceData}
+              submitLabel="Aplicar desde esta fecha"
+            />
           </div>
         ) : null}
       </article>
