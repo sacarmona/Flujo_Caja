@@ -1,6 +1,13 @@
 import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { assertCanManageReconciliation, canManageReconciliation, matchBankRow, type ReconciliationCandidate } from "./reconciliation";
+import {
+  assertCanManageReconciliation,
+  canManageReconciliation,
+  isAlreadyReconciled,
+  matchBankRow,
+  type ConfirmedBankRow,
+  type ReconciliationCandidate
+} from "./reconciliation";
 
 function candidate(overrides: Partial<ReconciliationCandidate> = {}): ReconciliationCandidate {
   return {
@@ -69,5 +76,58 @@ describe("matchBankRow", () => {
     );
 
     expect(result.matchLevel).toBe("NONE");
+  });
+});
+
+function confirmedRow(overrides: Partial<ConfirmedBankRow> = {}): ConfirmedBankRow {
+  return {
+    date: new Date(2026, 5, 18),
+    amount: new Prisma.Decimal(281308),
+    type: "CARGO",
+    reference: null,
+    ...overrides
+  };
+}
+
+describe("isAlreadyReconciled", () => {
+  it("detecta una fila ya conciliada por fecha, monto y tipo", () => {
+    const result = isAlreadyReconciled(
+      { date: new Date(2026, 5, 18), amount: new Prisma.Decimal(-281308), type: "CARGO", reference: null },
+      [confirmedRow()]
+    );
+
+    expect(result).toBe(true);
+  });
+
+  it("no marca como conciliada una fila de otro dia, monto o tipo", () => {
+    expect(
+      isAlreadyReconciled({ date: new Date(2026, 5, 19), amount: new Prisma.Decimal(-281308), type: "CARGO", reference: null }, [confirmedRow()])
+    ).toBe(false);
+    expect(
+      isAlreadyReconciled({ date: new Date(2026, 5, 18), amount: new Prisma.Decimal(-999), type: "CARGO", reference: null }, [confirmedRow()])
+    ).toBe(false);
+    expect(
+      isAlreadyReconciled({ date: new Date(2026, 5, 18), amount: new Prisma.Decimal(-281308), type: "ABONO", reference: null }, [confirmedRow()])
+    ).toBe(false);
+  });
+
+  it("si ambas filas tienen referencia, exige que coincida (evita falso positivo con mismo monto/dia)", () => {
+    const confirmed = confirmedRow({ reference: "DOC-1" });
+
+    expect(
+      isAlreadyReconciled({ date: new Date(2026, 5, 18), amount: new Prisma.Decimal(-281308), type: "CARGO", reference: "DOC-2" }, [confirmed])
+    ).toBe(false);
+    expect(
+      isAlreadyReconciled({ date: new Date(2026, 5, 18), amount: new Prisma.Decimal(-281308), type: "CARGO", reference: "DOC-1" }, [confirmed])
+    ).toBe(true);
+  });
+
+  it("sin referencia en alguna de las dos filas, basta fecha+monto+tipo", () => {
+    const result = isAlreadyReconciled(
+      { date: new Date(2026, 5, 18), amount: new Prisma.Decimal(-281308), type: "CARGO", reference: "DOC-1" },
+      [confirmedRow({ reference: null })]
+    );
+
+    expect(result).toBe(true);
   });
 });

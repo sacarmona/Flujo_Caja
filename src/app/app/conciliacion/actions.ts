@@ -4,13 +4,20 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import type { MovementType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
-import { parseBankStatementFile } from "@/lib/bank-statement-import";
+import { parseBankStatementFile, type BankStatementRawRow } from "@/lib/bank-statement-import";
 import { todayInAppTimeZone } from "@/lib/format";
 import { weekKeyOf } from "@/lib/iso-week";
 import { parseRequiredDate, validateMovementInput, type MovementFormInput } from "@/lib/movements";
 import { nextRealDateAfterPayment, pendingBalance, statusFromPayments, validatePaymentAmount } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
-import { assertCanManageReconciliation, matchBankRow, movementTypeForBankType, type ReconciliationCandidate } from "@/lib/reconciliation";
+import {
+  assertCanManageReconciliation,
+  isAlreadyReconciled,
+  matchBankRow,
+  movementTypeForBankType,
+  type ConfirmedBankRow,
+  type ReconciliationCandidate
+} from "@/lib/reconciliation";
 import { redirectSaved } from "@/lib/saved-redirect";
 
 function stringValue(formData: FormData, key: string): string {
@@ -62,6 +69,21 @@ export async function loadCandidates(companyId: string, bankAccountId: string, f
   }));
 }
 
+async function loadConfirmedBankRows(companyId: string, bankAccountId: string, rows: BankStatementRawRow[]): Promise<ConfirmedBankRow[]> {
+  if (rows.length === 0) return [];
+  const dates = rows.map((row) => row.date.getTime());
+
+  return prisma.bankMovement.findMany({
+    where: {
+      bankAccountId,
+      batch: { companyId },
+      date: { gte: new Date(Math.min(...dates)), lte: new Date(Math.max(...dates)) },
+      reconciliation: { confirmed: true }
+    },
+    select: { date: true, amount: true, type: true, reference: true }
+  });
+}
+
 export async function uploadBankStatementAction(formData: FormData) {
   const user = await requireReconciliationManager();
   const bankAccountId = stringValue(formData, "bankAccountId");
@@ -90,12 +112,25 @@ export async function uploadBankStatementAction(formData: FormData) {
    * (que suele traer varios dias o semanas previas).
    */
   const currentWeekKey = weekKeyOf(todayInAppTimeZone());
-  const rawRows = parsedRows.filter((row) => weekKeyOf(row.date) === currentWeekKey);
-  const skippedCount = parsedRows.length - rawRows.length;
+  const currentWeekRows = parsedRows.filter((row) => weekKeyOf(row.date) === currentWeekKey);
+  const skippedOldWeeks = parsedRows.length - currentWeekRows.length;
 
-  if (rawRows.length === 0) {
+  if (currentWeekRows.length === 0) {
     throw new Error("La cartola no tiene movimientos de la semana en curso (todos son de semanas anteriores).");
   }
+
+  const confirmedRows = await loadConfirmedBankRows(user.companyId, bankAccountId, currentWeekRows);
+  const rawRows = currentWeekRows.filter((row) => !isAlreadyReconciled(row, confirmedRows));
+  const skippedAlreadyReconciled = currentWeekRows.length - rawRows.length;
+
+  if (rawRows.length === 0) {
+    throw new Error("Todos los movimientos de la semana en curso de esta cartola ya fueron conciliados en una importacion anterior.");
+  }
+
+  const skipNotes = [
+    skippedOldWeeks > 0 ? `${skippedOldWeeks} de semanas anteriores` : null,
+    skippedAlreadyReconciled > 0 ? `${skippedAlreadyReconciled} ya conciliados` : null
+  ].filter((note): note is string => note !== null);
 
   const dates = rawRows.map((row) => row.date.getTime());
   const candidates = await loadCandidates(user.companyId, bankAccountId, new Date(Math.min(...dates)), new Date(Math.max(...dates)));
@@ -105,7 +140,7 @@ export async function uploadBankStatementAction(formData: FormData) {
       data: {
         companyId: user.companyId,
         bankAccountId,
-        fileName: skippedCount > 0 ? `${file.name} (se omitieron ${skippedCount} de semanas anteriores)` : file.name,
+        fileName: skipNotes.length > 0 ? `${file.name} (se omitieron ${skipNotes.join(", ")})` : file.name,
         status: "MAPPED",
         uploadedById: user.id
       }

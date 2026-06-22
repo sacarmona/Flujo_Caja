@@ -29,7 +29,7 @@ export type BankRowMatch = {
   candidates: ReconciliationCandidate[];
 };
 
-function isSameDay(a: Date, b: Date): boolean {
+export function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
@@ -64,4 +64,36 @@ export function matchBankRow(
     movementId: sameAmount.length === 1 ? sameAmount[0].movementId : null,
     candidates: sameAmount
   };
+}
+
+export type ConfirmedBankRow = {
+  date: Date;
+  amount: Prisma.Decimal;
+  type: BankMovementType;
+  reference: string | null;
+};
+
+/**
+ * Detecta si una fila de la cartola corresponde a un movimiento bancario que
+ * ya quedo conciliado (confirmado) en una importacion anterior, para no
+ * volver a mostrarlo como "nuevo" cuando la cartola se reenvia o se
+ * actualiza con un rango de fechas que se superpone con una subida previa.
+ * Se compara por fecha + monto + tipo (igual que el nivel HIGH de
+ * matchBankRow); si ambas filas tienen referencia del banco, tambien debe
+ * coincidir, para reducir falsos positivos cuando hay dos movimientos
+ * distintos del mismo monto el mismo dia.
+ */
+export function isAlreadyReconciled(
+  row: { date: Date; amount: Prisma.Decimal; type: BankMovementType; reference: string | null },
+  confirmedRows: ConfirmedBankRow[]
+): boolean {
+  return confirmedRows.some((confirmed) => {
+    if (!isSameDay(confirmed.date, row.date) || confirmed.type !== row.type || !confirmed.amount.abs().eq(row.amount.abs())) {
+      return false;
+    }
+    if (confirmed.reference && row.reference) {
+      return confirmed.reference === row.reference;
+    }
+    return true;
+  });
 }
