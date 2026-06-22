@@ -185,6 +185,19 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
   const confirmedForSuggestedWeek = suggestedOpening ? result.confirmedBalances.get(dateKey(suggestedOpening.date)) : undefined;
   const canEditOpeningBalance = canManageOpeningBalances(user.role);
   const headlineOpeningBalance = effectiveOpeningBalance(result);
+  /**
+   * Saldo diario actual: saldo acumulado del dia de hoy (o el siguiente dia
+   * habil si hoy no lo es) calculado solo con movimientos Parcial y
+   * Pagado/Cobrado (Modo Real), independiente del Modo seleccionado en el
+   * filtro. Se actualiza solo cuando se concilian/registran pagos, no con
+   * el solo paso de los dias, para que el usuario vea de inmediato el
+   * impacto de actualizar el saldo inicial de la semana en curso.
+   */
+  const currentDay = result.days[0];
+  const currentRealBalance = currentDay
+    ? calendarAccumulatedBalances(result.days, "real", result.openingBalance, result.confirmedBalances).get(dateKey(currentDay.date)) ??
+      result.openingBalance
+    : result.openingBalance;
 
   return (
     <section className="max-w-none">
@@ -275,8 +288,19 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
             <WalletCards className="size-5" aria-hidden="true" />
           </span>
           <div>
-            <h2 className="text-sm font-semibold text-adentu-ink">Saldo inicial Santander</h2>
-            <p className="mt-1 text-2xl font-semibold text-adentu-ink">{formatCurrency(Number(headlineOpeningBalance))}</p>
+            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+              <div>
+                <h2 className="text-sm font-semibold text-adentu-ink">Saldo inicial Santander</h2>
+                <p className="mt-1 text-2xl font-semibold text-adentu-ink">{formatCurrency(Number(headlineOpeningBalance))}</p>
+              </div>
+              {currentDay ? (
+                <div>
+                  <h2 className="text-sm font-semibold text-adentu-ink">Saldo diario actual ({dateLabel(currentDay.date)})</h2>
+                  <p className="mt-1 text-2xl font-semibold text-adentu-teal">{formatCurrency(Number(currentRealBalance))}</p>
+                  <p className="mt-1 text-xs text-slate-500">Solo movimientos Parcial y Pagado/Cobrado (Modo Real).</p>
+                </div>
+              ) : null}
+            </div>
             {suggestedOpening ? (
               <p className="mt-1 text-xs text-slate-600">
                 Semana {dateLabel(suggestedOpening.date)} calculada en {formatCurrency(Number(suggestedOpening.amount))}
