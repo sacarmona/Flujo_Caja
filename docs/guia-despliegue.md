@@ -239,26 +239,37 @@ Con el servidor de desarrollo corriendo y el seed cargado:
 
 ## 8. Pendientes antes de producción
 
-Estos puntos son bloqueantes o casi-bloqueantes para un uso real, no solo de
-prueba:
+Actualizado tras revisión contra el código real (2026-06-21). Resuelto desde
+la última revisión:
 
-- **Saldo inicial real**: no se ha definido. El cálculo de flujo de caja
-  parte de `0` hasta que alguien configure `OPENING_BALANCE_CLP`/`DATE` y se
-  reseed (o se inserte el `OpeningBalance` manualmente).
-- **Usuarios y contraseñas reales**: los 2 usuarios demo usan
-  `ChangeMe123!`. Reemplazar antes de dar acceso real.
-- **Tipo de cambio**: `ExchangeRateProvider` tiene una implementación
-  estática (`StaticExchangeRateProvider`) y una basada en `ExchangeRate` de
-  la base de datos (`DatabaseExchangeRateProvider`, en
-  `app/recurrentes/actions.ts`); no hay todavía un proveedor que consulte
-  `mindicador.cl` automáticamente. Sin tasas cargadas manualmente, los
-  movimientos en UF/USD/EUR fallarán al generarse.
-- **Adjuntos y conciliación bancaria**: el modelo de datos existe (Fase C)
-  pero no hay UI ni lógica de negocio para subir archivos ni importar
-  cartolas todavía.
-- **Auditoría de cambios de permisos**: confirmar que los cambios de rol de
-  usuario quedan en `AuditLog` (pendiente de revisión en la Fase D del plan
-  de consolidación).
+- ~~Tipo de cambio estático~~: **resuelto**. `CachedHttpExchangeRateProvider`
+  (`src/lib/exchange-rate-providers.ts`) consulta `mindicador.cl` por HTTP y
+  cachea el resultado; es el provider que usan `movimientos/actions.ts` y
+  `recurrentes/actions.ts`. Con tasa manual como respaldo si la consulta
+  automática falla.
+- ~~Conciliación bancaria sin UI~~: **resuelto**. `app/conciliacion` permite
+  subir la cartola (ambos formatos del banco), conciliar movimientos
+  existentes o crear los que falten, descartar filas o cancelar la
+  importación completa, y revertir una conciliación confirmada.
+- ~~Auditoría de cambios de permisos~~: **resuelto**. Editar un usuario
+  (incluyendo su rol) escribe `AuditLog` en
+  `app/configuracion/user-actions.ts`.
+
+Siguen pendientes para un uso real, no solo de prueba:
+
+- **Saldo inicial real**: la vista Calendario permite a ADMIN/FINANCE
+  configurar el `OpeningBalance` de la Cuenta Corriente Santander desde la
+  UI, pero el seed (`prisma/seed.mjs`) solo lo crea si `OPENING_BALANCE_CLP`
+  está definida como variable de entorno. Confirmar que el saldo configurado
+  en producción es el real (no quedó en `0` por defecto).
+- **Usuarios y contraseñas reales**: los 2 usuarios demo siguen con
+  `ChangeMe123!` en `prisma/seed.mjs`. Reemplazar antes de dar acceso real.
+- **Adjuntos**: el modelo `Attachment` existe en el esquema (relacionado a
+  `Movement` y `Payment`) pero no hay ninguna UI ni server action que cree
+  un adjunto todavía; sigue sin implementar.
+- **Recurrencias `THIS_AND_FOLLOWING`**: el modo "esta y las siguientes
+  ocurrencias" sigue reservado en el enum pero sin lógica que lo use; hoy
+  solo se puede editar la ocurrencia individual ya generada.
 - Esta rama (`consolidacion-cash-flow`) **no se ha fusionado a `master`**
   todavía — el despliegue automático desde GitHub debe apuntar
   explícitamente a esta rama hasta que se decida el merge.
