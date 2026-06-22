@@ -4,11 +4,13 @@ import type { Currency, MovementStatus, MovementType } from "@prisma/client";
 import { calculateSantanderCashFlow } from "@/lib/cash-flow-service";
 import {
   buildCalendarRows,
+  buildMovementTooltipIndex,
   calendarAccumulatedBalances,
   calendarCellAmount,
   calendarMode,
   calendarMonths,
   calendarStatusToken,
+  cellTooltip,
   groupDaysByWeek,
   movementCellHref,
   type CalendarMode
@@ -97,6 +99,34 @@ async function getReferenceData(companyId: string) {
   return { businessUnits, accounts };
 }
 
+async function getMovementTooltips(companyId: string, filters: SearchParams, startDate: Date, endDate: Date) {
+  const movements = await prisma.movement.findMany({
+    where: {
+      companyId,
+      deletedAt: null,
+      cancelledAt: null,
+      status: { not: "CANCELLED" },
+      bankAccount: { name: "Cuenta Corriente Santander" },
+      projectedDate: { gte: startDate, lte: endDate },
+      ...(filters.businessUnitId ? { businessUnitId: filters.businessUnitId } : {}),
+      ...(filters.accountingAccountId ? { accountingAccountId: filters.accountingAccountId } : {}),
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.type ? { type: filters.type } : {}),
+      ...(filters.currency ? { currency: filters.currency } : {})
+    },
+    select: { description: true, projectedAmountClp: true, accountingAccountId: true, projectedDate: true }
+  });
+
+  return buildMovementTooltipIndex(
+    movements.map((movement) => ({
+      description: movement.description,
+      amount: movement.projectedAmountClp,
+      accountingAccountId: movement.accountingAccountId,
+      projectedDate: movement.projectedDate
+    }))
+  );
+}
+
 function toggleCollapsedHref(category: string, filters: SearchParams, collapsed: Set<string>) {
   const next = new Set(collapsed);
   if (next.has(category)) next.delete(category);
@@ -133,6 +163,12 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
       currency: filters.currency
     }
   });
+  const movementTooltips = await getMovementTooltips(
+    user.companyId,
+    filters,
+    result.days[0]?.date ?? startDate,
+    result.days.at(-1)?.date ?? startDate
+  );
   const accounts = referenceData.accounts.map((account) => ({
     id: account.id,
     code: account.code,
@@ -370,9 +406,10 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
                     type: row.summary === "income" ? "INCOME" : row.summary === "expense" ? "EXPENSE" : undefined
                   });
                   const token = calendarStatusToken(row, amount);
+                  const title = cellTooltip(row, day, token, movementTooltips, formatCurrency);
                   return (
                     <td className="border-r border-t border-slate-200 px-2 py-2 text-right" key={`${row.key}:${dateKey(day.date)}`}>
-                      <Link className={`inline-flex items-center justify-end gap-1 whitespace-nowrap ${amountClass(amount)}`} href={href} title={token}>
+                      <Link className={`inline-flex items-center justify-end gap-1 whitespace-nowrap ${amountClass(amount)}`} href={href} title={title}>
                         <Indicator token={token} />
                         {formatCurrency(Number(amount))}
                       </Link>

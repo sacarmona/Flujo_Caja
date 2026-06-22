@@ -232,6 +232,45 @@ export function calendarStatusToken(row: CalendarRow, amount: Prisma.Decimal) {
   return "egreso pendiente/pagado";
 }
 
+export type CalendarMovementSummary = {
+  description: string;
+  amount: Prisma.Decimal | number | string;
+  accountingAccountId: string;
+  projectedDate: Date;
+};
+
+export type CalendarTooltipEntry = { description: string; amount: Prisma.Decimal };
+
+/**
+ * Indice de movimientos por cuenta+dia para mostrar su descripcion en el
+ * mouseover de cada celda (en vez del texto generico "ingreso/egreso
+ * pendiente/pagado"). Una celda puede agrupar varios movimientos del mismo
+ * dia y cuenta, por eso el valor es una lista.
+ */
+export function buildMovementTooltipIndex(movements: CalendarMovementSummary[]): Map<string, CalendarTooltipEntry[]> {
+  const index = new Map<string, CalendarTooltipEntry[]>();
+  for (const movement of movements) {
+    const key = `${movement.accountingAccountId}:${dateKey(movement.projectedDate)}`;
+    const entries = index.get(key) ?? [];
+    entries.push({ description: movement.description, amount: new Prisma.Decimal(movement.amount) });
+    index.set(key, entries);
+  }
+  return index;
+}
+
+export function cellTooltip(
+  row: CalendarRow,
+  day: CashFlowDay,
+  fallbackToken: string,
+  index: Map<string, CalendarTooltipEntry[]>,
+  formatCurrency: (amount: number) => string
+): string {
+  if (row.kind !== "account" || !row.accountId) return fallbackToken;
+  const entries = index.get(`${row.accountId}:${dateKey(day.date)}`);
+  if (!entries || entries.length === 0) return fallbackToken;
+  return entries.map((entry) => `${entry.description} (${formatCurrency(entry.amount.toNumber())})`).join("\n");
+}
+
 export function hasCalendarData(result: CashFlowResult) {
   return result.days.some((day) => !day.netFlow.isZero() || !day.accumulatedBalance.eq(result.openingBalance));
 }
