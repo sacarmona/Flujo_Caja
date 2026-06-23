@@ -728,6 +728,53 @@ export async function setRecurrenceActiveAction(formData: FormData) {
   await redirectSaved("/app/recurrentes");
 }
 
+/**
+ * Elimina definitivamente una regla recurrente sin movimientos asociados.
+ * Se exige 0 movimientos en total (incluyendo los eliminados logicamente),
+ * no solo 0 activos: Movement.recurrenceRuleId no tiene onDelete cascade,
+ * asi que si quedara algun registro historico (aunque este soft-deleted)
+ * el borrado fallaria por la restriccion de clave foranea en la base.
+ */
+export async function deleteRecurrenceAction(formData: FormData) {
+  const user = await requireRecurrenceManager();
+  const id = stringValue(formData, "id");
+  const confirmed = formData.get("confirmDelete") === "on";
+  const current = await prisma.recurrenceRule.findFirst({
+    where: { id, companyId: user.companyId },
+    include: { _count: { select: { movements: true } } }
+  });
+
+  if (!current) {
+    throw new Error("La recurrencia no existe.");
+  }
+
+  if (!confirmed) {
+    throw new Error("Debes confirmar la eliminacion.");
+  }
+
+  if (current._count.movements > 0) {
+    throw new Error("No se puede eliminar: la regla tiene movimientos asociados (incluso eliminados). Desactivala en su lugar.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.recurrenceRule.delete({ where: { id } });
+    await tx.auditLog.create({
+      data: {
+        companyId: user.companyId,
+        userId: user.id,
+        entity: "RecurrenceRule",
+        entityId: id,
+        action: "CANCEL",
+        before: JSON.parse(JSON.stringify(current)),
+        metadata: { source: "recurrence-hard-delete" }
+      }
+    });
+  });
+
+  revalidatePath("/app/recurrentes");
+  await redirectSaved("/app/recurrentes");
+}
+
 export async function generateRecurringMovementsAction(
   _prevState: GenerateMovementsState,
   formData: FormData

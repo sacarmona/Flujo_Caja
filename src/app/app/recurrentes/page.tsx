@@ -1,6 +1,12 @@
 import Link from "next/link";
 import type { MovementType, RecurrenceFrequency } from "@prisma/client";
-import { createRecurrenceAction, getRecurrenceDefaults, setRecurrenceActiveAction, updateRecurrenceAction } from "@/app/app/recurrentes/actions";
+import {
+  createRecurrenceAction,
+  deleteRecurrenceAction,
+  getRecurrenceDefaults,
+  setRecurrenceActiveAction,
+  updateRecurrenceAction
+} from "@/app/app/recurrentes/actions";
 import { GenerateMovementsButton } from "@/app/app/recurrentes/generate-movements-button";
 import { RecurrenceForm } from "@/app/app/recurrentes/recurrence-form";
 import { RecurrenceImportForm } from "@/app/app/recurrentes/recurrence-import-form";
@@ -314,6 +320,21 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
                           {recurrence.isActive ? "Desactivar" : "Activar"}
                         </button>
                       </form>
+                      {recurrence._count.movements === 0 ? (
+                        <form action={deleteRecurrenceAction} className="flex flex-wrap items-center gap-2">
+                          <input name="id" type="hidden" value={recurrence.id} />
+                          <label className="flex items-center gap-2 text-sm text-slate-600">
+                            <input name="confirmDelete" required type="checkbox" />
+                            Confirmo eliminar definitivamente
+                          </label>
+                          <button
+                            className="rounded-md border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 transition hover:border-red-600 hover:bg-red-50"
+                            type="submit"
+                          >
+                            Eliminar
+                          </button>
+                        </form>
+                      ) : null}
                     </div>
                   </div>
                 </details>
