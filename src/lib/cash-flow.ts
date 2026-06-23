@@ -281,10 +281,16 @@ export function calculateCashFlowByBusinessDay(
   const { startDate, endDate } = normalizeRange(options);
   const holidaySet = new Set(options.holidays ?? []);
   const confirmed = latestConfirmedBalance(openingBalances, startDate);
-  const catchUpFrom = confirmed ? addDays(confirmed.date, 1) : null;
+  /**
+   * El saldo confirmado representa el saldo al INICIO de confirmed.date
+   * (antes de los movimientos de ese mismo dia), asi que la ventana de
+   * catch-up debe incluir ese dia completo, no solo los dias posteriores:
+   * de lo contrario, si la confirmacion es justo el dia anterior a "hoy",
+   * los movimientos reales de ese dia anterior quedan sin sumarse.
+   */
   const catchUpRealNetFlow =
-    catchUpFrom && catchUpFrom < startDate
-      ? calculateRealNetFlow(movements, options.filters, catchUpFrom, addDays(startDate, -1), holidaySet)
+    confirmed && confirmed.date < startDate
+      ? calculateRealNetFlow(movements, options.filters, confirmed.date, addDays(startDate, -1), holidaySet)
       : new Prisma.Decimal(0);
   const openingBalance = (confirmed?.amount ?? new Prisma.Decimal(0)).plus(catchUpRealNetFlow);
   const days = businessDaysBetween(startDate, endDate, options.holidays).map<CashFlowDay>((date) => ({

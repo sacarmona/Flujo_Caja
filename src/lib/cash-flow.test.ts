@@ -321,6 +321,33 @@ describe("cash flow business-day service", () => {
     expect(result.openingBalance.toString()).toBe("1250000");
   });
 
+  it("incluye el propio dia de la confirmacion en el catch-up cuando la confirmacion es justo el dia anterior a hoy", () => {
+    const result = calculateCashFlowByBusinessDay(
+      [
+        {
+          ...baseMovement,
+          id: "paid-confirmation-day",
+          type: "EXPENSE" as const,
+          status: "PAID_OR_COLLECTED" as const,
+          projectedDate: date("2026-06-22"),
+          projectedAmountClp: "243000",
+          accountingAccountId: expenseAccount.id,
+          businessUnitId: unitAdmin.id,
+          accountingAccount: expenseAccount,
+          businessUnit: unitAdmin,
+          payments: [{ id: "pay-confirmation-day", amount: "243000", paidAt: date("2026-06-22"), currency: "CLP" as const }]
+        }
+      ],
+      [{ amount: "946293", balanceDate: date("2026-06-22"), deletedAt: null }],
+      { startDate: date("2026-06-23"), endDate: date("2026-06-23") }
+    );
+
+    // El confirmado del 22-jun representa el saldo al INICIO de ese dia, asi
+    // que el saldo de hoy (23-jun) debe restar tambien el egreso pagado el
+    // mismo 22-jun, no solo el del 23: 946293 - 243000 = 703293.
+    expect(result.openingBalance.toString()).toBe("703293");
+  });
+
   it("usa por defecto el saldo calculado entre semanas, pero respeta un saldo confirmado/actualizado a mitad de rango", () => {
     const result = calculateCashFlowByBusinessDay(
       [],
