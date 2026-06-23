@@ -140,16 +140,6 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
 
       <form className="mt-6 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-7">
         <label className="text-sm">
-          <span className="mb-1 block text-slate-600">Buscar</span>
-          <input
-            className="w-full rounded-md border border-slate-300 px-2 py-2"
-            type="search"
-            name="q"
-            placeholder="Descripcion..."
-            defaultValue={filters.q ?? ""}
-          />
-        </label>
-        <label className="text-sm">
           <span className="mb-1 block text-slate-600">Estado</span>
           <select className="w-full rounded-md border border-slate-300 px-2 py-2" name="state" defaultValue={filters.state ?? ""}>
             <option value="">Todas</option>
@@ -192,6 +182,16 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
             <option value="">Todos</option>
             <SelectOptions labels={typeLabels} values={movementTypes} />
           </select>
+        </label>
+        <label className="text-sm">
+          <span className="mb-1 block text-slate-600">Buscar</span>
+          <input
+            className="w-full rounded-md border border-slate-300 px-2 py-2"
+            type="search"
+            name="q"
+            placeholder="Descripcion..."
+            defaultValue={filters.q ?? ""}
+          />
         </label>
         <button className="self-end rounded-md bg-adentu-blue px-3 py-2 text-sm font-semibold text-white transition hover:bg-adentu-teal" type="submit">
           Filtrar
