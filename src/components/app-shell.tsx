@@ -72,13 +72,13 @@ export function AppShell({ children, user }: AppShellProps) {
         </nav>
 
         <button
-          aria-label={collapsed ? "Expandir menu" : "Colapsar menu"}
+          aria-label={collapsed ? "Expandir menu" : "Ocultar menu"}
           className="flex items-center justify-center gap-2 self-stretch rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:border-adentu-blue hover:text-adentu-blue"
           onClick={toggleCollapsed}
           type="button"
         >
           {collapsed ? <ChevronRight aria-hidden className="size-4" /> : <ChevronLeft aria-hidden className="size-4" />}
-          {collapsed ? null : "Colapsar"}
+          {collapsed ? null : "Ocultar"}
         </button>
       </aside>
 
