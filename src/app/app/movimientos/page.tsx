@@ -26,6 +26,7 @@ type SearchParams = {
   accountingAccountId?: string;
   businessUnitId?: string;
   recurrenceRuleId?: string;
+  late?: string;
 };
 
 type MovimientosPageProps = {
@@ -78,19 +79,21 @@ async function getReferenceData(companyId: string) {
 }
 
 function movementsWhere(companyId: string, filters: SearchParams) {
+  const late = filters.late === "true";
   return {
     companyId,
     deletedAt: null,
     ...(filters.type ? { type: filters.type } : {}),
-    ...(filters.status ? { status: filters.status } : {}),
+    ...(late ? { status: { in: ["PROJECTED", "PENDING"] as MovementStatus[] } } : filters.status ? { status: filters.status } : {}),
     ...(filters.accountingAccountId ? { accountingAccountId: filters.accountingAccountId } : {}),
     ...(filters.businessUnitId ? { businessUnitId: filters.businessUnitId } : {}),
     ...(filters.recurrenceRuleId ? { recurrenceRuleId: filters.recurrenceRuleId } : {}),
-    ...(filters.from || filters.to
+    ...(filters.from || filters.to || late
       ? {
           projectedDate: {
             ...(filters.from ? { gte: new Date(`${filters.from}T00:00:00.000`) } : {}),
-            ...(filters.to ? { lte: new Date(`${filters.to}T23:59:59.999`) } : {})
+            ...(filters.to ? { lte: new Date(`${filters.to}T23:59:59.999`) } : {}),
+            ...(late ? { lt: todayInAppTimeZone() } : {})
           }
         }
       : {})
@@ -202,7 +205,7 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
         </p>
       </div>
 
-      <form className="mt-6 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-7">
+      <form className="mt-6 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-8">
         <label className="text-sm">
           <span className="mb-1 block text-slate-600">Desde</span>
           <input className="w-full rounded-md border border-slate-300 px-2 py-2" name="from" type="date" defaultValue={filters.from ?? ""} />
@@ -250,6 +253,10 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
               </option>
             ))}
           </select>
+        </label>
+        <label className="flex items-end gap-2 text-sm text-slate-600">
+          <input defaultChecked={filters.late === "true"} name="late" type="checkbox" value="true" />
+          Solo atrasados
         </label>
         <button className="self-end rounded-md bg-adentu-blue px-3 py-2 text-sm font-semibold text-white transition hover:bg-adentu-teal" type="submit">
           Filtrar

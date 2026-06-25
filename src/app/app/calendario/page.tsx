@@ -159,7 +159,13 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
   const lastWeekStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() - 7);
   const lastWeekEnd = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() - 1);
   const collapsed = new Set((filters.collapsed ?? "").split("|").filter(Boolean));
-  const [referenceData, holidays] = await Promise.all([getReferenceData(user.companyId), getHolidayKeys(prisma)]);
+  const [referenceData, holidays, lateMovementsCount] = await Promise.all([
+    getReferenceData(user.companyId),
+    getHolidayKeys(prisma),
+    prisma.movement.count({
+      where: { companyId: user.companyId, deletedAt: null, status: { in: ["PROJECTED", "PENDING"] }, projectedDate: { lt: today } }
+    })
+  ]);
   const result = await calculateSantanderCashFlow({
     prisma,
     companyId: user.companyId,
@@ -217,6 +223,16 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
           Vista de flujo por dia habil basada en el motor de caja. Las celdas abren Movimientos filtrados por fecha y cuenta.
         </p>
       </div>
+
+      {lateMovementsCount > 0 ? (
+        <Link
+          className="mt-4 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+          href="/app/movimientos?late=true"
+        >
+          <AlertTriangle className="size-4 shrink-0" />
+          {lateMovementsCount} {lateMovementsCount === 1 ? "movimiento atrasado" : "movimientos atrasados"} sin gestionar
+        </Link>
+      ) : null}
 
       <form className="mt-6 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-8">
         <label className="text-sm">

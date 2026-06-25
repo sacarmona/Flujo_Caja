@@ -6,8 +6,8 @@ import type { MovementStatus } from "@prisma/client";
 import { cancelAndDeleteMovementAction, quickUpdateMovementAction } from "@/app/app/movimientos/actions";
 import { dateInputValue, optionLabel, statusLabels, typeLabels, type MovementWithRelations } from "@/app/app/movimientos/shared";
 import { AmountInput } from "@/components/amount-input";
-import { formatDate } from "@/lib/format";
-import { canCancelAndDeleteMovement } from "@/lib/movements";
+import { formatDate, todayInAppTimeZone } from "@/lib/format";
+import { canCancelAndDeleteMovement, isLateMovement } from "@/lib/movements";
 
 const quickEditableStatuses = Object.keys(statusLabels).filter((status) => status !== "CANCELLED") as MovementStatus[];
 
@@ -18,6 +18,7 @@ export function QuickEditRow({ canWrite, movement }: { canWrite: boolean; moveme
   const [isPending, startTransition] = useTransition();
   const editable = canWrite && movement.status !== "CANCELLED";
   const canCancelAndDelete = canWrite && canCancelAndDeleteMovement(movement);
+  const isLate = isLateMovement(movement, todayInAppTimeZone());
 
   function run(input: { projectedDate?: string; status?: MovementStatus; amount?: string }) {
     setError(null);
@@ -99,6 +100,9 @@ export function QuickEditRow({ canWrite, movement }: { canWrite: boolean; moveme
         ) : (
           statusLabels[movement.status]
         )}
+        {isLate ? (
+          <span className="ml-1.5 rounded border border-red-300 bg-red-50 px-1.5 py-0.5 text-xs font-semibold text-red-700">Atrasado</span>
+        ) : null}
         {error ? <p className="mt-1 max-w-[12rem] text-xs text-red-600">{error}</p> : null}
       </td>
       <td className="whitespace-nowrap px-3 py-2 text-right">

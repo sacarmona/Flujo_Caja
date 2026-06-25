@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertCanModifyMovements, canCancelAndDeleteMovement, parsePositiveDecimal, validateMovementInput } from "./movements";
+import { assertCanModifyMovements, canCancelAndDeleteMovement, isLateMovement, parsePositiveDecimal, validateMovementInput } from "./movements";
 
 const baseInput = {
   type: "INCOME" as const,
@@ -80,5 +80,16 @@ describe("movement rules", () => {
     expect(canCancelAndDeleteMovement({ status: "PARTIALLY_PAID", payments: [], _count: { reconciliations: 0 } })).toBe(false);
     expect(canCancelAndDeleteMovement({ status: "PAID_OR_COLLECTED", payments: [], _count: { reconciliations: 0 } })).toBe(false);
     expect(canCancelAndDeleteMovement({ status: "PROJECTED", payments: [], _count: { reconciliations: 1 } })).toBe(false);
+  });
+
+  it("marca como atrasado solo lo Proyectado/Pendiente con fecha proyectada ya pasada", () => {
+    const today = new Date(2026, 5, 23);
+    expect(isLateMovement({ status: "PROJECTED", projectedDate: new Date(2026, 5, 19) }, today)).toBe(true);
+    expect(isLateMovement({ status: "PENDING", projectedDate: new Date(2026, 5, 22) }, today)).toBe(true);
+    expect(isLateMovement({ status: "PROJECTED", projectedDate: new Date(2026, 5, 23) }, today)).toBe(false);
+    expect(isLateMovement({ status: "PROJECTED", projectedDate: new Date(2026, 5, 25) }, today)).toBe(false);
+    expect(isLateMovement({ status: "PARTIALLY_PAID", projectedDate: new Date(2026, 5, 19) }, today)).toBe(false);
+    expect(isLateMovement({ status: "PAID_OR_COLLECTED", projectedDate: new Date(2026, 5, 19) }, today)).toBe(false);
+    expect(isLateMovement({ status: "CANCELLED", projectedDate: new Date(2026, 5, 19) }, today)).toBe(false);
   });
 });

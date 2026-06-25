@@ -53,6 +53,13 @@ export type MovementReference = {
   costCenter?: { id: string; isActive: boolean; deletedAt: Date | null } | null;
 };
 
+/** Estados que cuentan como "Atrasado": aun no se cobra/paga (ni siquiera parcial) y su fecha proyectada ya paso. */
+const lateEligibleStatuses: MovementStatus[] = ["PROJECTED", "PENDING"];
+
+export function isLateMovement(movement: { status: MovementStatus; projectedDate: Date }, today: Date): boolean {
+  return lateEligibleStatuses.includes(movement.status) && movement.projectedDate < today;
+}
+
 export function canModifyMovements(role: Role): boolean {
   return role === "ADMIN" || role === "FINANCE" || role === "MOVEMENT_ENTRY";
 }
