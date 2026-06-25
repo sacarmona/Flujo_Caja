@@ -6,19 +6,25 @@ import type { MovementStatus } from "@prisma/client";
 import { cancelAndDeleteMovementAction, quickUpdateMovementAction } from "@/app/app/movimientos/actions";
 import { dateInputValue, optionLabel, statusLabels, typeLabels, type MovementWithRelations } from "@/app/app/movimientos/shared";
 import { AmountInput } from "@/components/amount-input";
-import { formatDate, todayInAppTimeZone } from "@/lib/format";
-import { canCancelAndDeleteMovement, isLateMovement } from "@/lib/movements";
+import { formatDate } from "@/lib/format";
+import { canCancelAndDeleteMovement } from "@/lib/movements";
 
 const quickEditableStatuses = Object.keys(statusLabels).filter((status) => status !== "CANCELLED") as MovementStatus[];
 
-export function QuickEditRow({ canWrite, movement }: { canWrite: boolean; movement: MovementWithRelations }) {
+/**
+ * isLate se calcula en el servidor (page.tsx) y se recibe por prop: este es
+ * un componente cliente, y comparar fechas con "hoy" calculado en el
+ * navegador puede desfasarse un dia segun la zona horaria local del
+ * dispositivo (projectedDate se construye en el servidor, en su propia
+ * zona); comparar en el mismo lado evita ese desfase.
+ */
+export function QuickEditRow({ canWrite, isLate, movement }: { canWrite: boolean; isLate: boolean; movement: MovementWithRelations }) {
   const [date, setDate] = useState(dateInputValue(movement.projectedDate));
   const [status, setStatus] = useState(movement.status);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const editable = canWrite && movement.status !== "CANCELLED";
   const canCancelAndDelete = canWrite && canCancelAndDeleteMovement(movement);
-  const isLate = isLateMovement(movement, todayInAppTimeZone());
 
   function run(input: { projectedDate?: string; status?: MovementStatus; amount?: string }) {
     setError(null);

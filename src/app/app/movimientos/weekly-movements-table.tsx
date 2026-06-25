@@ -12,7 +12,15 @@ export type WeekGroup = {
   items: MovementWithRelations[];
 };
 
-export function WeeklyMovementsTable({ canWrite, weeks }: { canWrite: boolean; weeks: WeekGroup[] }) {
+export function WeeklyMovementsTable({
+  canWrite,
+  lateMovementIds,
+  weeks
+}: {
+  canWrite: boolean;
+  lateMovementIds: Set<string>;
+  weeks: WeekGroup[];
+}) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   function toggleWeek(key: string) {
@@ -75,7 +83,9 @@ export function WeeklyMovementsTable({ canWrite, weeks }: { canWrite: boolean; w
                 </tr>
                 {isCollapsed
                   ? null
-                  : week.items.map((movement) => <QuickEditRow canWrite={canWrite} key={movement.id} movement={movement} />)}
+                  : week.items.map((movement) => (
+                      <QuickEditRow canWrite={canWrite} isLate={lateMovementIds.has(movement.id)} key={movement.id} movement={movement} />
+                    ))}
               </Fragment>
             );
           })}

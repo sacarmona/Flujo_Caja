@@ -12,7 +12,7 @@ import { formatCurrency, todayInAppTimeZone } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { getHolidayKeys } from "@/lib/holidays-cl";
 import { weekKeyOf } from "@/lib/iso-week";
-import { canModifyMovements, movementStatuses, movementTypes } from "@/lib/movements";
+import { canModifyMovements, isLateMovement, movementStatuses, movementTypes } from "@/lib/movements";
 import { prisma } from "@/lib/prisma";
 
 const pageSize = 30;
@@ -188,6 +188,8 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
     getWeeklyBalances(user.companyId, filters)
   ]);
   const canWrite = canModifyMovements(user.role);
+  const today = todayInAppTimeZone();
+  const lateMovementIds = new Set(result.items.filter((movement) => isLateMovement(movement, today)).map((movement) => movement.id));
   const weeks = groupByWeek(result.items, (movement) => movement.projectedDate).map((week) => {
     const balance = weeklyBalances.get(week.key);
     return { ...week, balanceText: balance ? `Saldo: ${formatCurrency(balance.toNumber())}` : "" };
@@ -301,7 +303,7 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
             No hay movimientos para los filtros seleccionados.
           </div>
         ) : (
-          <WeeklyMovementsTable canWrite={canWrite} weeks={weeks} />
+          <WeeklyMovementsTable canWrite={canWrite} lateMovementIds={lateMovementIds} weeks={weeks} />
         )}
 
         <div className="flex justify-end">
