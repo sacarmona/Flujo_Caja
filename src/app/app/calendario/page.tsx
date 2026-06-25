@@ -12,6 +12,7 @@ import {
   calendarStatusToken,
   cellTooltip,
   groupDaysByWeek,
+  mondayOfWeek,
   movementCellHref,
   type CalendarMode
 } from "@/lib/calendar-view";
@@ -148,7 +149,15 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
 
   const months = calendarMonths(filters.months);
   const mode = calendarMode(filters.mode);
-  const startDate = todayInAppTimeZone();
+  const today = todayInAppTimeZone();
+  /**
+   * La grilla siempre arranca el lunes de la semana en curso (no "hoy"), asi
+   * los usuarios ven tambien los dias ya pasados de esta semana. Solo avanza
+   * al iniciar la semana siguiente, no dia a dia.
+   */
+  const startDate = mondayOfWeek(today);
+  const lastWeekStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() - 7);
+  const lastWeekEnd = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() - 1);
   const collapsed = new Set((filters.collapsed ?? "").split("|").filter(Boolean));
   const [referenceData, holidays] = await Promise.all([getReferenceData(user.companyId), getHolidayKeys(prisma)]);
   const result = await calculateSantanderCashFlow({
@@ -193,7 +202,7 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
    * el solo paso de los dias, para que el usuario vea de inmediato el
    * impacto de actualizar el saldo inicial de la semana en curso.
    */
-  const currentDay = result.days[0];
+  const currentDay = [...result.days].reverse().find((day) => day.date <= today) ?? result.days[0];
   const currentRealBalance = currentDay
     ? calendarAccumulatedBalances(result.days, "real", result.openingBalance, result.confirmedBalances).get(dateKey(currentDay.date)) ??
       result.openingBalance
@@ -382,10 +391,18 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
         </div>
       </section>
 
-      <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-600">
-        <span className="inline-flex items-center gap-1"><ArrowUpCircle className="size-3.5 text-adentu-teal" /> Ingresos pendientes/pagados</span>
-        <span className="inline-flex items-center gap-1"><ArrowDownCircle className="size-3.5 text-red-700" /> Egresos pendientes/pagados</span>
-        <span className="inline-flex items-center gap-1"><AlertTriangle className="size-3.5 text-red-700" /> Saldo negativo o alerta</span>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-3 text-xs text-slate-600">
+          <span className="inline-flex items-center gap-1"><ArrowUpCircle className="size-3.5 text-adentu-teal" /> Ingresos pendientes/pagados</span>
+          <span className="inline-flex items-center gap-1"><ArrowDownCircle className="size-3.5 text-red-700" /> Egresos pendientes/pagados</span>
+          <span className="inline-flex items-center gap-1"><AlertTriangle className="size-3.5 text-red-700" /> Saldo negativo o alerta</span>
+        </div>
+        <Link
+          className="text-sm font-semibold text-adentu-blue"
+          href={`/app/movimientos?from=${dateKey(lastWeekStart)}&to=${dateKey(lastWeekEnd)}`}
+        >
+          Ver movimientos de la semana pasada
+        </Link>
       </div>
 
       <div className="mt-6 max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white">

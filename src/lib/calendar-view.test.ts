@@ -7,6 +7,7 @@ import {
   calendarMode,
   calendarMonths,
   groupDaysByWeek,
+  mondayOfWeek,
   movementCellHref,
   weeklyAccumulatedBalances,
   type CalendarAccount
@@ -145,6 +146,12 @@ describe("calendar view helpers", () => {
     expect(movementCellHref({ date: new Date(2026, 5, 15), accountId: "income" })).toBe(
       "/app/movimientos?from=2026-06-15&to=2026-06-15&accountingAccountId=income"
     );
+  });
+
+  it("calcula el lunes de la semana calendario de cualquier dia, incluido domingo", () => {
+    expect(mondayOfWeek(new Date(2026, 5, 17)).getTime()).toBe(new Date(2026, 5, 15).getTime()); // miercoles -> lunes misma semana
+    expect(mondayOfWeek(new Date(2026, 5, 15)).getTime()).toBe(new Date(2026, 5, 15).getTime()); // lunes -> el mismo dia
+    expect(mondayOfWeek(new Date(2026, 5, 21)).getTime()).toBe(new Date(2026, 5, 15).getTime()); // domingo -> lunes de esa semana
   });
 
   it("groups days by Monday-start weeks", () => {

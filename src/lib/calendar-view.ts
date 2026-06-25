@@ -33,6 +33,13 @@ export function calendarMode(value?: string): CalendarMode {
   return value === "real" || value === "pending" || value === "comparison" ? value : "projected";
 }
 
+/** Lunes de la semana calendario (lunes a domingo) que contiene la fecha dada, sea o no dia habil. */
+export function mondayOfWeek(date: Date): Date {
+  const day = date.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + diffToMonday);
+}
+
 /**
  * Clave del lunes de la semana de una fecha. No se puede agrupar buscando
  * directamente un dia con getDay() === 1 porque `days` solo contiene dias
@@ -41,9 +48,7 @@ export function calendarMode(value?: string): CalendarMode {
  * con la anterior.
  */
 function mondayKey(date: Date): string {
-  const day = date.getDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  return dateKey(new Date(date.getFullYear(), date.getMonth(), date.getDate() + diffToMonday));
+  return dateKey(mondayOfWeek(date));
 }
 
 export function groupDaysByWeek(days: CashFlowDay[]) {
