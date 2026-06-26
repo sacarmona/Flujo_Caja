@@ -5,6 +5,7 @@ import {
   canManageReconciliation,
   isAlreadyReconciled,
   matchBankRow,
+  partitionAlreadyReconciled,
   type ConfirmedBankRow,
   type ReconciliationCandidate
 } from "./reconciliation";
@@ -129,5 +130,30 @@ describe("isAlreadyReconciled", () => {
     );
 
     expect(result).toBe(true);
+  });
+});
+
+describe("partitionAlreadyReconciled", () => {
+  it("no marca como conciliado un segundo movimiento nuevo con la misma fecha+monto+tipo que uno ya confirmado", () => {
+    // Caso real: el banco no informa N° de documento util (todas las filas
+    // traen el mismo placeholder), asi que dos movimientos distintos del
+    // mismo dia y monto solo se distinguen por cuantas veces aparecen.
+    const row = { date: new Date(2026, 5, 18), amount: new Prisma.Decimal(-30000), type: "CARGO" as const, reference: "000000000" };
+    const result = partitionAlreadyReconciled(
+      [row, row],
+      [confirmedRow({ amount: new Prisma.Decimal(-30000), reference: "000000000" })]
+    );
+
+    expect(result.alreadyReconciledCount).toBe(1);
+    expect(result.newRows).toHaveLength(1);
+  });
+
+  it("no rechaza filas nuevas de una fecha distinta solo porque otra fecha de la misma cartola ya estaba conciliada", () => {
+    const oldRow = { date: new Date(2026, 5, 18), amount: new Prisma.Decimal(-281308), type: "CARGO" as const, reference: null };
+    const newRow = { date: new Date(2026, 5, 19), amount: new Prisma.Decimal(-50000), type: "CARGO" as const, reference: null };
+    const result = partitionAlreadyReconciled([oldRow, newRow], [confirmedRow()]);
+
+    expect(result.alreadyReconciledCount).toBe(1);
+    expect(result.newRows).toEqual([newRow]);
   });
 });

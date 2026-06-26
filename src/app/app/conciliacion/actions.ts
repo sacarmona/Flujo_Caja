@@ -12,9 +12,9 @@ import { nextRealDateAfterPayment, pendingBalance, statusFromPayments, validateP
 import { prisma } from "@/lib/prisma";
 import {
   assertCanManageReconciliation,
-  isAlreadyReconciled,
   matchBankRow,
   movementTypeForBankType,
+  partitionAlreadyReconciled,
   type ConfirmedBankRow,
   type ReconciliationCandidate
 } from "@/lib/reconciliation";
@@ -120,8 +120,7 @@ export async function uploadBankStatementAction(formData: FormData) {
   }
 
   const confirmedRows = await loadConfirmedBankRows(user.companyId, bankAccountId, currentWeekRows);
-  const rawRows = currentWeekRows.filter((row) => !isAlreadyReconciled(row, confirmedRows));
-  const skippedAlreadyReconciled = currentWeekRows.length - rawRows.length;
+  const { newRows: rawRows, alreadyReconciledCount: skippedAlreadyReconciled } = partitionAlreadyReconciled(currentWeekRows, confirmedRows);
 
   if (rawRows.length === 0) {
     throw new Error("Todos los movimientos de la semana en curso de esta cartola ya fueron conciliados en una importacion anterior.");
