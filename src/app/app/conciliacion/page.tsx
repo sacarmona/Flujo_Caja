@@ -12,6 +12,7 @@ import {
   uploadBankStatementAction
 } from "./actions";
 import { optionLabel } from "../movimientos/shared";
+import { ErrorBanner } from "@/components/error-banner";
 import { SavedBanner } from "@/components/saved-banner";
 import { formatCurrency } from "@/lib/format";
 
@@ -78,6 +79,7 @@ export default async function ConciliacionPage() {
   return (
     <section className="max-w-5xl space-y-8">
       <SavedBanner />
+      <ErrorBanner />
       <div className="border-b border-slate-200 pb-5">
         <h1 className="text-2xl font-semibold tracking-normal text-adentu-ink">Conciliacion bancaria</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">

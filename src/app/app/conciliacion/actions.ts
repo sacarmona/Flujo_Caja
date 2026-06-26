@@ -18,7 +18,7 @@ import {
   type ConfirmedBankRow,
   type ReconciliationCandidate
 } from "@/lib/reconciliation";
-import { redirectSaved } from "@/lib/saved-redirect";
+import { redirectSaved, redirectWithError } from "@/lib/saved-redirect";
 
 function stringValue(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -90,19 +90,19 @@ export async function uploadBankStatementAction(formData: FormData) {
   const file = formData.get("file");
 
   if (!(file instanceof File) || file.size === 0) {
-    throw new Error("Selecciona un archivo de cartola (XLSX) para importar.");
+    return redirectWithError("/app/conciliacion", "Selecciona un archivo de cartola (XLSX) para importar.");
   }
 
   const bankAccount = await prisma.bankAccount.findFirst({ where: { id: bankAccountId, companyId: user.companyId } });
   if (!bankAccount) {
-    throw new Error("La cuenta bancaria no existe.");
+    return redirectWithError("/app/conciliacion", "La cuenta bancaria no existe.");
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const parsedRows = await parseBankStatementFile(buffer);
 
   if (parsedRows.length === 0) {
-    throw new Error("La planilla no tiene movimientos para importar.");
+    return redirectWithError("/app/conciliacion", "La planilla no tiene movimientos para importar.");
   }
 
   /**
@@ -116,14 +116,17 @@ export async function uploadBankStatementAction(formData: FormData) {
   const skippedOldWeeks = parsedRows.length - currentWeekRows.length;
 
   if (currentWeekRows.length === 0) {
-    throw new Error("La cartola no tiene movimientos de la semana en curso (todos son de semanas anteriores).");
+    return redirectWithError("/app/conciliacion", "La cartola no tiene movimientos de la semana en curso (todos son de semanas anteriores).");
   }
 
   const confirmedRows = await loadConfirmedBankRows(user.companyId, bankAccountId, currentWeekRows);
   const { newRows: rawRows, alreadyReconciledCount: skippedAlreadyReconciled } = partitionAlreadyReconciled(currentWeekRows, confirmedRows);
 
   if (rawRows.length === 0) {
-    throw new Error("Todos los movimientos de la semana en curso de esta cartola ya fueron conciliados en una importacion anterior.");
+    return redirectWithError(
+      "/app/conciliacion",
+      "Todos los movimientos de la semana en curso de esta cartola ya fueron conciliados en una importacion anterior."
+    );
   }
 
   const skipNotes = [
