@@ -6,7 +6,7 @@ import type { MovementType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { parseBankStatementFile, type BankStatementRawRow } from "@/lib/bank-statement-import";
 import { todayInAppTimeZone } from "@/lib/format";
-import { weekKeyOf } from "@/lib/iso-week";
+import { mondayOfWeek } from "@/lib/calendar-view";
 import { parseRequiredDate, validateMovementInput, type MovementFormInput } from "@/lib/movements";
 import { nextRealDateAfterPayment, pendingBalance, statusFromPayments, validatePaymentAmount } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
@@ -106,17 +106,21 @@ export async function uploadBankStatementAction(formData: FormData) {
   }
 
   /**
-   * Solo se concilia la semana en curso: si el saldo inicial de la semana
-   * ya quedo actualizado, los movimientos de semanas anteriores no
-   * necesitan revisarse de nuevo aunque vengan incluidos en la cartola
-   * (que suele traer varios dias o semanas previas).
+   * No se concilian semanas anteriores a la actual: si el saldo inicial de
+   * esas semanas ya quedo actualizado, sus movimientos no necesitan
+   * revisarse de nuevo aunque vengan incluidos en la cartola (que suele
+   * traer varios dias o semanas previas). Las semanas futuras SI se
+   * concilian: el banco puede liquidar movimientos "contablemente" de la
+   * semana siguiente antes de que esa semana comience (ej. el viernes
+   * 26/6 ya aparecen cargos con fecha 30/6), y no hay razon para
+   * bloquearlos solo por eso.
    */
-  const currentWeekKey = weekKeyOf(todayInAppTimeZone());
-  const currentWeekRows = parsedRows.filter((row) => weekKeyOf(row.date) === currentWeekKey);
+  const currentWeekStart = mondayOfWeek(todayInAppTimeZone());
+  const currentWeekRows = parsedRows.filter((row) => mondayOfWeek(row.date) >= currentWeekStart);
   const skippedOldWeeks = parsedRows.length - currentWeekRows.length;
 
   if (currentWeekRows.length === 0) {
-    return redirectWithError("/app/conciliacion", "La cartola no tiene movimientos de la semana en curso (todos son de semanas anteriores).");
+    return redirectWithError("/app/conciliacion", "La cartola no tiene movimientos de la semana en curso o posteriores (todos son de semanas anteriores).");
   }
 
   const confirmedRows = await loadConfirmedBankRows(user.companyId, bankAccountId, currentWeekRows);
