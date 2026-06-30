@@ -24,6 +24,7 @@ export function QuickEditRow({ canWrite, isLate, movement }: { canWrite: boolean
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const editable = canWrite && movement.status !== "CANCELLED";
+  const financialFieldsEditable = editable && movement.status !== "PAID_OR_COLLECTED";
   const canCancelAndDelete = canWrite && canCancelAndDeleteMovement(movement);
 
   function run(input: { projectedDate?: string; status?: MovementStatus; amount?: string }) {
@@ -56,7 +57,7 @@ export function QuickEditRow({ canWrite, isLate, movement }: { canWrite: boolean
   return (
     <tr className="border-b border-slate-100 align-top last:border-b-0">
       <td className="whitespace-nowrap px-3 py-2">
-        {editable ? (
+        {financialFieldsEditable ? (
           <input
             className="w-32 rounded-md border border-transparent px-1.5 py-1 text-sm hover:border-slate-300 focus:border-adentu-blue focus:outline-none"
             disabled={isPending}
@@ -73,7 +74,7 @@ export function QuickEditRow({ canWrite, isLate, movement }: { canWrite: boolean
       <td className="whitespace-nowrap px-3 py-2 text-sm text-slate-600">{typeLabels[movement.type]}</td>
       <td className="px-3 py-2 text-sm text-slate-600">{optionLabel(movement.accountingAccount.code, movement.accountingAccount.name)}</td>
       <td className="whitespace-nowrap px-3 py-2 text-right">
-        {editable ? (
+        {financialFieldsEditable ? (
           <AmountInput
             className="w-28 rounded-md border border-transparent px-1.5 py-1 text-right text-sm hover:border-slate-300 focus:border-adentu-blue focus:outline-none"
             defaultValue={movement.amount.toString()}

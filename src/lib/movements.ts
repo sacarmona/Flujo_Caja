@@ -70,6 +70,27 @@ export function assertCanModifyMovements(role: Role): void {
   }
 }
 
+export function assertPaidMovementFinancialFieldsUnchanged(
+  movement: {
+    status: MovementStatus;
+    amount: Prisma.Decimal | string | number;
+    projectedDate: Date;
+    realDate: Date | null;
+  },
+  input: Pick<MovementFormInput, "amount" | "projectedDate" | "realDate">
+): void {
+  if (movement.status !== "PAID_OR_COLLECTED") return;
+
+  const amountChanged = !new Prisma.Decimal(movement.amount).eq(parsePositiveDecimal(input.amount));
+  const projectedDateChanged = parseRequiredDate(input.projectedDate).getTime() !== movement.projectedDate.getTime();
+  const inputRealDate = parseOptionalDate(input.realDate);
+  const realDateChanged = inputRealDate?.getTime() !== movement.realDate?.getTime();
+
+  if (amountChanged || projectedDateChanged || realDateChanged) {
+    throw new Error("No se puede modificar el monto ni las fechas de un movimiento pagado o cobrado.");
+  }
+}
+
 export function canCancelAndDeleteMovement(movement: {
   status: MovementStatus;
   deletedAt?: Date | null;

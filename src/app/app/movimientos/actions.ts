@@ -5,7 +5,14 @@ import { Prisma } from "@prisma/client";
 import type { Currency, MovementStatus, MovementType } from "@prisma/client";
 import { resolveConversionAllowManualFallback } from "@/lib/exchange-rates";
 import { CachedHttpExchangeRateProvider } from "@/lib/exchange-rate-providers";
-import { assertCanModifyMovements, canCancelAndDeleteMovement, movementStatuses, validateMovementInput, type MovementFormInput } from "@/lib/movements";
+import {
+  assertCanModifyMovements,
+  assertPaidMovementFinancialFieldsUnchanged,
+  canCancelAndDeleteMovement,
+  movementStatuses,
+  validateMovementInput,
+  type MovementFormInput
+} from "@/lib/movements";
 import { getCurrentUser } from "@/lib/auth";
 import {
   nextRealDateAfterPayment,
@@ -145,6 +152,7 @@ export async function updateMovementAction(formData: FormData) {
   }
 
   const input = formInput(formData);
+  assertPaidMovementFinancialFieldsUnchanged(current, input);
   const data = validateMovementInput(input, await references(user.companyId, input));
   const conversion = await resolveConversionAllowManualFallback({
     amount: data.amount,
@@ -198,6 +206,10 @@ export async function quickUpdateMovementAction(input: {
 
   if (current.status === "CANCELLED") {
     throw new Error("No se puede editar un movimiento cancelado.");
+  }
+
+  if (current.status === "PAID_OR_COLLECTED" && (input.projectedDate !== undefined || input.amount !== undefined)) {
+    throw new Error("No se puede modificar el monto ni la fecha de un movimiento pagado o cobrado.");
   }
 
   const data: Prisma.MovementUpdateInput = {};

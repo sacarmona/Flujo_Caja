@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { assertCanModifyMovements, canCancelAndDeleteMovement, isLateMovement, parsePositiveDecimal, validateMovementInput } from "./movements";
+import { Prisma } from "@prisma/client";
+import {
+  assertCanModifyMovements,
+  assertPaidMovementFinancialFieldsUnchanged,
+  canCancelAndDeleteMovement,
+  isLateMovement,
+  parsePositiveDecimal,
+  validateMovementInput
+} from "./movements";
 
 const baseInput = {
   type: "INCOME" as const,
@@ -80,6 +88,23 @@ describe("movement rules", () => {
     expect(canCancelAndDeleteMovement({ status: "PARTIALLY_PAID", payments: [], _count: { reconciliations: 0 } })).toBe(false);
     expect(canCancelAndDeleteMovement({ status: "PAID_OR_COLLECTED", payments: [], _count: { reconciliations: 0 } })).toBe(false);
     expect(canCancelAndDeleteMovement({ status: "PROJECTED", payments: [], _count: { reconciliations: 1 } })).toBe(false);
+  });
+
+  it("prevents changing amount or dates after a movement is paid or collected", () => {
+    const paidMovement = {
+      status: "PAID_OR_COLLECTED" as const,
+      amount: new Prisma.Decimal("100000"),
+      projectedDate: new Date("2026-06-18T00:00:00.000"),
+      realDate: new Date("2026-06-20T00:00:00.000")
+    };
+    const unchanged = { ...baseInput, realDate: "2026-06-20" };
+
+    expect(() => assertPaidMovementFinancialFieldsUnchanged(paidMovement, unchanged)).not.toThrow();
+    expect(() => assertPaidMovementFinancialFieldsUnchanged(paidMovement, { ...unchanged, amount: "100001" })).toThrow("pagado o cobrado");
+    expect(() => assertPaidMovementFinancialFieldsUnchanged(paidMovement, { ...unchanged, projectedDate: "2026-06-19" })).toThrow(
+      "pagado o cobrado"
+    );
+    expect(() => assertPaidMovementFinancialFieldsUnchanged(paidMovement, { ...unchanged, realDate: "2026-06-21" })).toThrow("pagado o cobrado");
   });
 
   it("marca como atrasado solo lo Proyectado/Pendiente con fecha proyectada ya pasada", () => {

@@ -39,6 +39,7 @@ export function MovementForm({
   submitLabel: string;
 }) {
   const [type, setType] = useState<MovementType>(movement?.type ?? "INCOME");
+  const financialFieldsLocked = movement?.status === "PAID_OR_COLLECTED";
   const matchingAccounts = accounts.filter((account) => accountMatchesMovementType(account.type, type));
   const currentAccountStillMatches = movement?.accountingAccountId
     ? matchingAccounts.some((account) => account.id === movement.accountingAccountId)
@@ -47,6 +48,11 @@ export function MovementForm({
   return (
     <form action={action} className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-6">
       {movement ? <input name="id" type="hidden" value={movement.id} /> : null}
+      {financialFieldsLocked ? (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 md:col-span-6">
+          El monto y las fechas no se pueden modificar porque este movimiento esta pagado o cobrado.
+        </p>
+      ) : null}
       <label className="text-sm">
         <span className="mb-1 block text-slate-600">Tipo</span>
         <select
@@ -89,6 +95,7 @@ export function MovementForm({
         <AmountInput
           className="w-full rounded-md border border-slate-300 px-2 py-2"
           defaultValue={movement?.amount.toString() ?? ""}
+          disabled={financialFieldsLocked}
           name="amount"
           required
         />
@@ -182,7 +189,9 @@ export function MovementForm({
           required
           type="date"
           defaultValue={movement ? dateInputValue(movement.projectedDate) : todayInputValue()}
+          disabled={financialFieldsLocked}
         />
+        {financialFieldsLocked ? <input name="projectedDate" type="hidden" value={dateInputValue(movement?.projectedDate ?? null)} /> : null}
       </label>
       <label className="text-sm">
         <span className="mb-1 block text-slate-600">Fecha real</span>
@@ -191,7 +200,9 @@ export function MovementForm({
           name="realDate"
           type="date"
           defaultValue={dateInputValue(movement?.realDate ?? null)}
+          disabled={financialFieldsLocked}
         />
+        {financialFieldsLocked ? <input name="realDate" type="hidden" value={dateInputValue(movement?.realDate ?? null)} /> : null}
       </label>
       <label className="text-sm md:col-span-2">
         <span className="mb-1 block text-slate-600">Estado</span>
