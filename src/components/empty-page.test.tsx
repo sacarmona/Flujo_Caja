@@ -1,8 +1,11 @@
+// @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import React from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { EmptyPage } from "./empty-page";
+
+afterEach(cleanup);
 
 describe("EmptyPage", () => {
   it("renders a title and pending module state", () => {
