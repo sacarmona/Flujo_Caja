@@ -105,100 +105,112 @@ export async function uploadBankStatementAction(formData: FormData) {
     return redirectWithError("/app/conciliacion", "La cuenta bancaria no existe.");
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const parsedRows = await parseBankStatementFile(buffer);
+  let rawRows: Awaited<ReturnType<typeof parseBankStatementFile>>;
+  let skipNotes: string[];
 
-  if (parsedRows.length === 0) {
-    return redirectWithError("/app/conciliacion", "La planilla no tiene movimientos para importar.");
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const parsedRows = await parseBankStatementFile(buffer);
+
+    if (parsedRows.length === 0) {
+      return redirectWithError("/app/conciliacion", "La planilla no tiene movimientos para importar.");
+    }
+
+    /**
+     * No se concilian semanas anteriores a la actual: si el saldo inicial de
+     * esas semanas ya quedo actualizado, sus movimientos no necesitan
+     * revisarse de nuevo aunque vengan incluidos en la cartola (que suele
+     * traer varios dias o semanas previas). Las semanas futuras SI se
+     * concilian: el banco puede liquidar movimientos "contablemente" de la
+     * semana siguiente antes de que esa semana comience (ej. el viernes
+     * 26/6 ya aparecen cargos con fecha 30/6), y no hay razon para
+     * bloquearlos solo por eso.
+     */
+    const currentWeekStart = mondayOfWeek(todayInAppTimeZone());
+    const currentWeekRows = parsedRows.filter((row) => mondayOfWeek(row.date) >= currentWeekStart);
+    const skippedOldWeeks = parsedRows.length - currentWeekRows.length;
+
+    if (currentWeekRows.length === 0) {
+      return redirectWithError("/app/conciliacion", "La cartola no tiene movimientos de la semana en curso o posteriores (todos son de semanas anteriores).");
+    }
+
+    const confirmedRows = await loadConfirmedBankRows(user.companyId, bankAccountId, currentWeekRows);
+    const partitioned = partitionAlreadyReconciled(currentWeekRows, confirmedRows);
+    rawRows = partitioned.newRows;
+
+    if (rawRows.length === 0) {
+      return redirectWithError(
+        "/app/conciliacion",
+        "Todos los movimientos de la semana en curso de esta cartola ya fueron conciliados en una importacion anterior."
+      );
+    }
+
+    skipNotes = [
+      skippedOldWeeks > 0 ? `${skippedOldWeeks} de semanas anteriores` : null,
+      partitioned.alreadyReconciledCount > 0 ? `${partitioned.alreadyReconciledCount} ya conciliados` : null
+    ].filter((note): note is string => note !== null);
+  } catch (error) {
+    return redirectWithError("/app/conciliacion", error instanceof Error ? error.message : "No se pudo leer la cartola.");
   }
 
-  /**
-   * No se concilian semanas anteriores a la actual: si el saldo inicial de
-   * esas semanas ya quedo actualizado, sus movimientos no necesitan
-   * revisarse de nuevo aunque vengan incluidos en la cartola (que suele
-   * traer varios dias o semanas previas). Las semanas futuras SI se
-   * concilian: el banco puede liquidar movimientos "contablemente" de la
-   * semana siguiente antes de que esa semana comience (ej. el viernes
-   * 26/6 ya aparecen cargos con fecha 30/6), y no hay razon para
-   * bloquearlos solo por eso.
-   */
-  const currentWeekStart = mondayOfWeek(todayInAppTimeZone());
-  const currentWeekRows = parsedRows.filter((row) => mondayOfWeek(row.date) >= currentWeekStart);
-  const skippedOldWeeks = parsedRows.length - currentWeekRows.length;
+  try {
+    const dates = rawRows.map((row) => row.date.getTime());
+    const candidates = await loadCandidates(user.companyId, bankAccountId, new Date(Math.min(...dates)), new Date(Math.max(...dates)));
 
-  if (currentWeekRows.length === 0) {
-    return redirectWithError("/app/conciliacion", "La cartola no tiene movimientos de la semana en curso o posteriores (todos son de semanas anteriores).");
-  }
+    await prisma.$transaction(async (tx) => {
+      const batch = await tx.bankImportBatch.create({
+        data: {
+          companyId: user.companyId,
+          bankAccountId,
+          fileName: skipNotes.length > 0 ? `${file.name} (se omitieron ${skipNotes.join(", ")})` : file.name,
+          status: "MAPPED",
+          uploadedById: user.id
+        }
+      });
 
-  const confirmedRows = await loadConfirmedBankRows(user.companyId, bankAccountId, currentWeekRows);
-  const { newRows: rawRows, alreadyReconciledCount: skippedAlreadyReconciled } = partitionAlreadyReconciled(currentWeekRows, confirmedRows);
+      for (const raw of rawRows) {
+        await tx.bankImportRow.create({
+          data: {
+            batchId: batch.id,
+            rowNumber: raw.rowNumber,
+            rawData: JSON.parse(
+              JSON.stringify({
+                fecha: raw.date,
+                monto: raw.amount.toString(),
+                tipo: raw.type,
+                descripcion: raw.description,
+                referencia: raw.reference,
+                sucursal: raw.branch
+              })
+            )
+          }
+        });
 
-  if (rawRows.length === 0) {
-    return redirectWithError(
-      "/app/conciliacion",
-      "Todos los movimientos de la semana en curso de esta cartola ya fueron conciliados en una importacion anterior."
-    );
-  }
+        const bankMovement = await tx.bankMovement.create({
+          data: {
+            batchId: batch.id,
+            bankAccountId,
+            date: raw.date,
+            amount: raw.amount,
+            type: raw.type,
+            description: raw.description,
+            reference: raw.reference
+          }
+        });
 
-  const skipNotes = [
-    skippedOldWeeks > 0 ? `${skippedOldWeeks} de semanas anteriores` : null,
-    skippedAlreadyReconciled > 0 ? `${skippedAlreadyReconciled} ya conciliados` : null
-  ].filter((note): note is string => note !== null);
-
-  const dates = rawRows.map((row) => row.date.getTime());
-  const candidates = await loadCandidates(user.companyId, bankAccountId, new Date(Math.min(...dates)), new Date(Math.max(...dates)));
-
-  await prisma.$transaction(async (tx) => {
-    const batch = await tx.bankImportBatch.create({
-      data: {
-        companyId: user.companyId,
-        bankAccountId,
-        fileName: skipNotes.length > 0 ? `${file.name} (se omitieron ${skipNotes.join(", ")})` : file.name,
-        status: "MAPPED",
-        uploadedById: user.id
+        const match = matchBankRow(raw, candidates);
+        await tx.reconciliation.create({
+          data: {
+            bankMovementId: bankMovement.id,
+            movementId: match.movementId,
+            matchLevel: match.matchLevel
+          }
+        });
       }
     });
-
-    for (const raw of rawRows) {
-      await tx.bankImportRow.create({
-        data: {
-          batchId: batch.id,
-          rowNumber: raw.rowNumber,
-          rawData: JSON.parse(
-            JSON.stringify({
-              fecha: raw.date,
-              monto: raw.amount.toString(),
-              tipo: raw.type,
-              descripcion: raw.description,
-              referencia: raw.reference,
-              sucursal: raw.branch
-            })
-          )
-        }
-      });
-
-      const bankMovement = await tx.bankMovement.create({
-        data: {
-          batchId: batch.id,
-          bankAccountId,
-          date: raw.date,
-          amount: raw.amount,
-          type: raw.type,
-          description: raw.description,
-          reference: raw.reference
-        }
-      });
-
-      const match = matchBankRow(raw, candidates);
-      await tx.reconciliation.create({
-        data: {
-          bankMovementId: bankMovement.id,
-          movementId: match.movementId,
-          matchLevel: match.matchLevel
-        }
-      });
-    }
-  });
+  } catch (error) {
+    return redirectWithError("/app/conciliacion", error instanceof Error ? error.message : "No se pudo importar la cartola.");
+  }
 
   revalidatePath("/app/conciliacion");
   await redirectSaved("/app/conciliacion");
