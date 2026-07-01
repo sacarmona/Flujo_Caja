@@ -60,8 +60,9 @@ function positiveRate(value: string): Prisma.Decimal {
   return rate;
 }
 
+/** El CLP no tiene decimales (no existen centavos de peso); redondear a entero evita que la conciliacion exacta contra montos de cartola bancaria (siempre enteros) falle por diferencias de centesimas. */
 export function clpAmount(amount: Prisma.Decimal | number | string, rate: Prisma.Decimal): Prisma.Decimal {
-  return decimal(amount).mul(rate).toDecimalPlaces(2);
+  return decimal(amount).mul(rate).toDecimalPlaces(0);
 }
 
 export async function resolveConversion(input: ConversionInput): Promise<ConversionResult> {

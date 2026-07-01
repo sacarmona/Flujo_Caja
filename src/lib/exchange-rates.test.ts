@@ -17,6 +17,17 @@ describe("exchange conversion", () => {
     expect(result.projectedAmountClp.toString()).toBe("1234");
   });
 
+  it("redondea a entero (el CLP no tiene decimales) para que calce exacto contra montos de cartola bancaria", async () => {
+    const result = await resolveConversion({
+      amount: "3",
+      currency: "UF",
+      date,
+      provider: new StaticExchangeRateProvider({ UF: "38123.456" })
+    });
+
+    expect(result.projectedAmountClp.toString()).toBe("114370");
+  });
+
   it("converts UF", async () => {
     const result = await resolveConversion({
       amount: "2",

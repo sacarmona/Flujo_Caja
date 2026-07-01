@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import type { Currency, MovementStatus, MovementType } from "@prisma/client";
-import { resolveConversionAllowManualFallback } from "@/lib/exchange-rates";
+import { clpAmount, resolveConversionAllowManualFallback } from "@/lib/exchange-rates";
 import { CachedHttpExchangeRateProvider } from "@/lib/exchange-rate-providers";
 import {
   assertCanModifyMovements,
@@ -237,7 +237,7 @@ export async function quickUpdateMovementAction(input: {
       throw new Error("El monto debe ser mayor a 0.");
     }
     data.amount = amount;
-    data.projectedAmountClp = current.currency === "CLP" ? amount : amount.mul(current.projectedRate);
+    data.projectedAmountClp = current.currency === "CLP" ? amount : clpAmount(amount, current.projectedRate);
   }
 
   const updated = await prisma.movement.update({ where: { id: input.id }, data });
