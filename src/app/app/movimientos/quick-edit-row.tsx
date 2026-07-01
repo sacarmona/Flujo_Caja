@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import type { MovementStatus } from "@prisma/client";
 import { cancelAndDeleteMovementAction, quickUpdateMovementAction } from "@/app/app/movimientos/actions";
-import { dateInputValue, optionLabel, statusLabels, typeLabels, type MovementWithRelations } from "@/app/app/movimientos/shared";
+import { dateInputValue, optionLabel, statusLabels, typeLabels, type MovementFormValues } from "@/app/app/movimientos/shared";
 import { AmountInput } from "@/components/amount-input";
 import { formatDate } from "@/lib/format";
 import { canCancelAndDeleteMovement } from "@/lib/movements";
@@ -18,7 +18,7 @@ const quickEditableStatuses = Object.keys(statusLabels).filter((status) => statu
  * dispositivo (projectedDate se construye en el servidor, en su propia
  * zona); comparar en el mismo lado evita ese desfase.
  */
-export function QuickEditRow({ canWrite, isLate, movement }: { canWrite: boolean; isLate: boolean; movement: MovementWithRelations }) {
+export function QuickEditRow({ canWrite, isLate, movement }: { canWrite: boolean; isLate: boolean; movement: MovementFormValues }) {
   const [date, setDate] = useState(dateInputValue(movement.projectedDate));
   const [status, setStatus] = useState(movement.status);
   const [error, setError] = useState<string | null>(null);
@@ -77,12 +77,12 @@ export function QuickEditRow({ canWrite, isLate, movement }: { canWrite: boolean
         {financialFieldsEditable ? (
           <AmountInput
             className="w-28 rounded-md border border-transparent px-1.5 py-1 text-right text-sm hover:border-slate-300 focus:border-adentu-blue focus:outline-none"
-            defaultValue={movement.amount.toString()}
+            defaultValue={movement.amount}
             disabled={isPending}
-            onBlur={(value) => value !== movement.amount.toString() && run({ amount: value })}
+            onBlur={(value) => value !== movement.amount && run({ amount: value })}
           />
         ) : (
-          movement.amount.toString()
+          movement.amount
         )}
         <span className="ml-1 text-xs text-slate-400">{movement.currency}</span>
       </td>

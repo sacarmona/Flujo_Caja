@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import type { MovementStatus, MovementType } from "@prisma/client";
 import { createMovementAction, getMovementDefaults } from "@/app/app/movimientos/actions";
 import { MovementForm } from "@/app/app/movimientos/movement-form";
-import { groupByWeek, movementInclude, statusLabels, typeLabels } from "@/app/app/movimientos/shared";
+import { groupByWeek, movementInclude, serializeMovementForForm, statusLabels, typeLabels } from "@/app/app/movimientos/shared";
 import { WeeklyMovementsTable } from "@/app/app/movimientos/weekly-movements-table";
 import { Pagination } from "@/components/pagination";
 import { SavedBanner } from "@/components/saved-banner";
@@ -197,7 +197,7 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
   const lateMovementIds = new Set(result.items.filter((movement) => isLateMovement(movement, today)).map((movement) => movement.id));
   const weeks = groupByWeek(result.items, (movement) => movement.projectedDate).map((week) => {
     const balance = weeklyBalances.get(week.key);
-    return { ...week, balanceText: balance ? `Saldo: ${formatCurrency(balance.toNumber())}` : "" };
+    return { ...week, items: week.items.map(serializeMovementForForm), balanceText: balance ? `Saldo: ${formatCurrency(balance.toNumber())}` : "" };
   });
 
   return (

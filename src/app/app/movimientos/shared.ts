@@ -32,6 +32,30 @@ export const movementInclude = {
 
 export type MovementWithRelations = Prisma.MovementGetPayload<{ include: typeof movementInclude }>;
 
+/**
+ * Solo strings/numeros/fechas planos: Movement viene de un Server Component
+ * y sus campos Decimal (amount, projectedRate, projectedAmountClp,
+ * payments[].amount) no son serializables hacia un Client Component
+ * (MovementForm, QuickEditRow). projectedAmountClp se descarta directamente
+ * (no se usa en ningun formulario), el resto se convierte a string.
+ */
+export type MovementFormValues = Omit<MovementWithRelations, "amount" | "projectedRate" | "projectedAmountClp" | "payments"> & {
+  amount: string;
+  projectedRate: string;
+  payments: Array<Omit<MovementWithRelations["payments"][number], "amount"> & { amount: string }>;
+};
+
+export function serializeMovementForForm(movement: MovementWithRelations): MovementFormValues {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { projectedAmountClp, ...rest } = movement;
+  return {
+    ...rest,
+    amount: movement.amount.toString(),
+    projectedRate: movement.projectedRate.toString(),
+    payments: movement.payments.map((payment) => ({ ...payment, amount: payment.amount.toString() }))
+  };
+}
+
 export function optionLabel(code: string | null | undefined, name: string) {
   return code ? `${code} - ${name}` : name;
 }

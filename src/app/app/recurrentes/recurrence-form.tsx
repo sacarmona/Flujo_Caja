@@ -57,9 +57,10 @@ type ReferenceData = {
   vendors: { id: string; name: string }[];
 };
 
+/** Solo strings/numeros/fechas planos: RecurrenceRule viene de un Server Component y sus campos Decimal no son serializables hacia un Client Component. */
 type RecurrenceLike = {
   accountingAccountId: string;
-  amount: Parameters<typeof recurrenceAmountToString>[0];
+  amount: string;
   bankAccountId: string;
   businessUnitId: string;
   costCenterId: string | null;
@@ -71,7 +72,7 @@ type RecurrenceLike = {
   frequency: RecurrenceFrequency;
   id: string;
   intervalDays: number | null;
-  manualRate: Parameters<typeof recurrenceAmountToString>[0] | null;
+  manualRate: string | null;
   manualRateReason: string | null;
   notes: string | null;
   projectId: string | null;

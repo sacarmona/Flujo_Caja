@@ -3,14 +3,14 @@ import { notFound } from "next/navigation";
 import { cancelMovementAction, getMovementDefaults, updateMovementAction } from "@/app/app/movimientos/actions";
 import { MovementForm } from "@/app/app/movimientos/movement-form";
 import { PaymentPanel } from "@/app/app/movimientos/payment-panel";
-import { formatAmount, movementInclude, optionLabel, statusLabels, typeLabels } from "@/app/app/movimientos/shared";
+import { formatAmount, movementInclude, optionLabel, serializeMovementForForm, statusLabels, typeLabels } from "@/app/app/movimientos/shared";
 import { editThisAndFollowingAction } from "@/app/app/recurrentes/actions";
 import { RecurrenceForm } from "@/app/app/recurrentes/recurrence-form";
 import { SavedBanner } from "@/components/saved-banner";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { canModifyMovements } from "@/lib/movements";
-import { canManageRecurrences } from "@/lib/recurrence-rules";
+import { canManageRecurrences, serializeRecurrenceForForm } from "@/lib/recurrence-rules";
 import { prisma } from "@/lib/prisma";
 
 async function getReferenceData(companyId: string) {
@@ -103,7 +103,7 @@ export default async function MovimientoDetailPage({ params }: { params: Promise
               businessUnits={referenceData.businessUnits}
               costCenters={referenceData.costCenters}
               defaults={defaults}
-              movement={movement}
+              movement={serializeMovementForForm(movement)}
               projects={referenceData.projects}
               submitLabel="Guardar"
               vendors={referenceData.vendors}
@@ -129,7 +129,10 @@ export default async function MovimientoDetailPage({ params }: { params: Promise
             <RecurrenceForm
               action={editThisAndFollowingAction}
               defaults={defaults}
-              recurrence={{ ...recurrenceRule, startDate: movement.recurrenceOccurrenceDate ?? recurrenceRule.startDate }}
+              recurrence={{
+                ...serializeRecurrenceForForm(recurrenceRule),
+                startDate: movement.recurrenceOccurrenceDate ?? recurrenceRule.startDate
+              }}
               referenceData={referenceData}
               submitLabel="Aplicar desde esta fecha"
             />

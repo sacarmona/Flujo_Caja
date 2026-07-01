@@ -3,13 +3,13 @@
 import { Fragment, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { QuickEditRow } from "@/app/app/movimientos/quick-edit-row";
-import type { MovementWithRelations } from "@/app/app/movimientos/shared";
+import type { MovementFormValues } from "@/app/app/movimientos/shared";
 
 export type WeekGroup = {
   key: string;
   label: string;
   balanceText: string;
-  items: MovementWithRelations[];
+  items: MovementFormValues[];
 };
 
 export function WeeklyMovementsTable({

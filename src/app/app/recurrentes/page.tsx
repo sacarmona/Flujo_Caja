@@ -15,7 +15,13 @@ import { Pagination } from "@/components/pagination";
 import { SavedBanner } from "@/components/saved-banner";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
-import { canManageRecurrences, generatedMovementLink, previewRecurrence, recurrenceFrequencies } from "@/lib/recurrence-rules";
+import {
+  canManageRecurrences,
+  generatedMovementLink,
+  previewRecurrence,
+  recurrenceFrequencies,
+  serializeRecurrenceForForm
+} from "@/lib/recurrence-rules";
 import { dateKey } from "@/lib/recurrences";
 import { getHolidayKeys } from "@/lib/holidays-cl";
 import { movementTypes } from "@/lib/movements";
@@ -302,7 +308,7 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
                     <RecurrenceForm
                       action={updateRecurrenceAction}
                       defaults={defaults}
-                      recurrence={recurrence}
+                      recurrence={serializeRecurrenceForForm(recurrence)}
                       referenceData={referenceData}
                       submitLabel="Guardar"
                     />

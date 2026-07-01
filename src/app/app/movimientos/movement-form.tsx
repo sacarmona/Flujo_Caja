@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { AccountingAccountType, MovementType } from "@prisma/client";
 import { AmountInput } from "@/components/amount-input";
 import { accountMatchesMovementType, movementCurrencies, movementStatuses, movementTypes } from "@/lib/movements";
-import { dateInputValue, optionLabel, statusLabels, todayInputValue, typeLabels, type MovementWithRelations } from "@/app/app/movimientos/shared";
+import { dateInputValue, optionLabel, statusLabels, todayInputValue, typeLabels, type MovementFormValues } from "@/app/app/movimientos/shared";
 
 type ReferenceLists = {
   accounts: { id: string; code: string | null; name: string; type: AccountingAccountType }[];
@@ -37,7 +37,7 @@ export function MovementForm({
 }: ReferenceLists & {
   action: (formData: FormData) => void | Promise<void>;
   defaults: { bankAccountId: string; businessUnitId: string };
-  movement?: MovementWithRelations;
+  movement?: MovementFormValues;
   submitLabel: string;
 }) {
   const [type, setType] = useState<MovementType>(movement?.type ?? "INCOME");
@@ -96,7 +96,7 @@ export function MovementForm({
         <span className="mb-1 block text-slate-600">Monto bruto</span>
         <AmountInput
           className="w-full rounded-md border border-slate-300 px-2 py-2"
-          defaultValue={movement?.amount.toString() ?? ""}
+          defaultValue={movement?.amount ?? ""}
           disabled={financialFieldsLocked}
           name="amount"
           required
@@ -120,7 +120,7 @@ export function MovementForm({
           name="manualRate"
           step="0.000001"
           type="number"
-          defaultValue={movement?.isManualRate ? movement.projectedRate.toString() : ""}
+          defaultValue={movement?.isManualRate ? movement.projectedRate : ""}
         />
       </label>
       <label className="text-sm md:col-span-3">

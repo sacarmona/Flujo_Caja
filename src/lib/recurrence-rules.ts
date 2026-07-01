@@ -238,3 +238,19 @@ export function generatedMovementLink(ruleId: string) {
 export function recurrenceAmountToString(amount: Prisma.Decimal | number | string) {
   return amount instanceof Prisma.Decimal ? amount.toString() : String(amount);
 }
+
+/**
+ * Convierte los campos Decimal (amount, manualRate) de una RecurrenceRule a
+ * strings planos antes de pasarla como prop a RecurrenceForm ("use client"):
+ * Prisma.Decimal no es serializable a traves del limite Server -> Client
+ * Component (ver RecurrenceLike en recurrence-form.tsx).
+ */
+export function serializeRecurrenceForForm<T extends { amount: Prisma.Decimal; manualRate: Prisma.Decimal | null }>(
+  recurrence: T
+): Omit<T, "amount" | "manualRate"> & { amount: string; manualRate: string | null } {
+  return {
+    ...recurrence,
+    amount: recurrence.amount.toString(),
+    manualRate: recurrence.manualRate?.toString() ?? null
+  };
+}
