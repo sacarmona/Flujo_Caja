@@ -88,6 +88,7 @@ model Company {
   projects           Project[]
   recurrenceRules    RecurrenceRule[]
   users              User[]
+  vendors            Vendor[]
 }
 
 model User {
@@ -256,6 +257,7 @@ model Movement {
   bankAccountId            String
   projectId                String?
   costCenterId             String?
+  vendorId                 String?
   type                     MovementType
   status                   MovementStatus @default(PROJECTED)
   description              String
@@ -280,6 +282,7 @@ model Movement {
   businessUnit      BusinessUnit      @relation(fields: [businessUnitId], references: [id])
   company           Company           @relation(fields: [companyId], references: [id])
   costCenter        CostCenter?       @relation(fields: [costCenterId], references: [id])
+  vendor            Vendor?           @relation(fields: [vendorId], references: [id])
   payments          Payment[]
   project           Project?          @relation(fields: [projectId], references: [id])
   recurrenceRule    RecurrenceRule?   @relation(fields: [recurrenceRuleId], references: [id])
@@ -294,6 +297,7 @@ model Movement {
   @@index([costCenterId])
   @@index([projectId])
   @@index([recurrenceRuleId])
+  @@index([vendorId])
 }
 
 model RecurrenceRule {
@@ -304,6 +308,7 @@ model RecurrenceRule {
   bankAccountId       String
   projectId           String?
   costCenterId        String?
+  vendorId            String?
   type                MovementType
   description         String
   amount              Decimal             @db.Decimal(14, 2)
@@ -329,6 +334,7 @@ model RecurrenceRule {
   businessUnit      BusinessUnit      @relation(fields: [businessUnitId], references: [id])
   company           Company           @relation(fields: [companyId], references: [id])
   costCenter        CostCenter?       @relation(fields: [costCenterId], references: [id])
+  vendor            Vendor?           @relation(fields: [vendorId], references: [id])
   movements         Movement[]
   project           Project?          @relation(fields: [projectId], references: [id])
 
@@ -338,6 +344,36 @@ model RecurrenceRule {
   @@index([companyId, startDate])
   @@index([costCenterId])
   @@index([projectId])
+  @@index([vendorId])
+}
+
+/// Proveedor con deuda historica que se va abonando a traves de movimientos
+/// de Egreso (Pago). initialDebtClp es el monto Total adeudado al momento de
+/// cargar el proveedor (editable manualmente); el saldo pendiente (y si esta
+/// liquidado o sobrepagado) se calcula en cada lectura restando lo
+/// efectivamente pagado (Movement.payments de movimientos vinculados, igual
+/// criterio que Modo Real: Parcial + Pagado/Cobrado) - no se guarda como
+/// columna para que siempre quede consistente con los pagos reales sin
+/// depender de que cada punto de registro de pago lo actualice.
+model Vendor {
+  id                   String    @id @default(cuid())
+  companyId            String
+  category             String
+  name                 String
+  referenceInstallment Decimal?  @db.Decimal(14, 2)
+  dueDay               Int?
+  initialDebtClp       Decimal   @db.Decimal(14, 2)
+  notes                String?
+  isActive             Boolean   @default(true)
+  deletedAt            DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  company         Company          @relation(fields: [companyId], references: [id])
+  movements       Movement[]
+  recurrenceRules RecurrenceRule[]
+
+  @@index([companyId])
 }
 
 model Payment {

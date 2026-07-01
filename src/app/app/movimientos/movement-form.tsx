@@ -12,6 +12,7 @@ type ReferenceLists = {
   businessUnits: { id: string; name: string }[];
   costCenters: { id: string; code: string | null; name: string }[];
   projects: { id: string; name: string }[];
+  vendors: { id: string; name: string }[];
 };
 
 export function SelectOptions<T extends string>({ values, labels }: { values: readonly T[]; labels: Record<T, string> }) {
@@ -31,7 +32,8 @@ export function MovementForm({
   defaults,
   movement,
   projects,
-  submitLabel
+  submitLabel,
+  vendors
 }: ReferenceLists & {
   action: (formData: FormData) => void | Promise<void>;
   defaults: { bankAccountId: string; businessUnitId: string };
@@ -181,6 +183,19 @@ export function MovementForm({
           ))}
         </select>
       </label>
+      {type === "EXPENSE" ? (
+        <label className="text-sm md:col-span-2">
+          <span className="mb-1 block text-slate-600">Proveedor (deuda historica)</span>
+          <select className="w-full rounded-md border border-slate-300 px-2 py-2" name="vendorId" defaultValue={movement?.vendorId ?? ""}>
+            <option value="">Sin proveedor</option>
+            {vendors.map((vendor) => (
+              <option key={vendor.id} value={vendor.id}>
+                {vendor.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       <label className="text-sm">
         <span className="mb-1 block text-slate-600">Fecha proyectada</span>
         <input

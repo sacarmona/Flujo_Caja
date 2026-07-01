@@ -45,6 +45,7 @@ function formInput(formData: FormData): MovementFormInput {
     businessUnitId: stringValue(formData, "businessUnitId"),
     projectId: optionalStringValue(formData, "projectId"),
     costCenterId: optionalStringValue(formData, "costCenterId"),
+    vendorId: optionalStringValue(formData, "vendorId"),
     projectedDate: stringValue(formData, "projectedDate"),
     realDate: optionalStringValue(formData, "realDate"),
     status: stringValue(formData, "status") as MovementStatus,
@@ -64,7 +65,7 @@ async function requireMovementWriter() {
 }
 
 async function references(companyId: string, input: MovementFormInput) {
-  const [accountingAccount, bankAccount, businessUnit, project, costCenter] = await Promise.all([
+  const [accountingAccount, bankAccount, businessUnit, project, costCenter, vendor] = await Promise.all([
     prisma.accountingAccount.findFirst({
       where: { id: input.accountingAccountId, companyId },
       include: { _count: { select: { children: true } } }
@@ -72,10 +73,11 @@ async function references(companyId: string, input: MovementFormInput) {
     prisma.bankAccount.findFirst({ where: { id: input.bankAccountId, companyId } }),
     prisma.businessUnit.findFirst({ where: { id: input.businessUnitId, companyId } }),
     input.projectId ? prisma.project.findFirst({ where: { id: input.projectId, companyId } }) : Promise.resolve(null),
-    input.costCenterId ? prisma.costCenter.findFirst({ where: { id: input.costCenterId, companyId } }) : Promise.resolve(null)
+    input.costCenterId ? prisma.costCenter.findFirst({ where: { id: input.costCenterId, companyId } }) : Promise.resolve(null),
+    input.vendorId ? prisma.vendor.findFirst({ where: { id: input.vendorId, companyId } }) : Promise.resolve(null)
   ]);
 
-  return { accountingAccount, bankAccount, businessUnit, project, costCenter };
+  return { accountingAccount, bankAccount, businessUnit, project, costCenter, vendor };
 }
 
 async function audit(params: {

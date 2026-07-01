@@ -46,7 +46,7 @@ function optionLabel(code: string | null | undefined, name: string) {
 }
 
 async function getReferenceData(companyId: string) {
-  const [accounts, businessUnits, bankAccounts, projects, costCenters] = await Promise.all([
+  const [accounts, businessUnits, bankAccounts, projects, costCenters, vendors] = await Promise.all([
     prisma.accountingAccount.findMany({
       where: {
         companyId,
@@ -72,10 +72,15 @@ async function getReferenceData(companyId: string) {
     prisma.costCenter.findMany({
       where: { companyId, isActive: true, deletedAt: null },
       orderBy: [{ name: "asc" }]
+    }),
+    prisma.vendor.findMany({
+      where: { companyId, isActive: true, deletedAt: null },
+      select: { id: true, name: true },
+      orderBy: [{ name: "asc" }]
     })
   ]);
 
-  return { accounts, businessUnits, bankAccounts, projects, costCenters };
+  return { accounts, businessUnits, bankAccounts, projects, costCenters, vendors };
 }
 
 function movementsWhere(companyId: string, filters: SearchParams) {
@@ -283,6 +288,7 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
               defaults={defaults}
               projects={referenceData.projects}
               submitLabel="Crear"
+              vendors={referenceData.vendors}
             />
           </div>
         </details>

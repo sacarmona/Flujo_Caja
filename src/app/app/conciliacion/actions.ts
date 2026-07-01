@@ -318,6 +318,7 @@ export async function createMovementFromBankRowAction(formData: FormData) {
       businessUnitId,
       projectId,
       costCenterId,
+      vendorId: null,
       projectedDate: projectedDateText,
       realDate: projectedDateText,
       status: "PENDING",

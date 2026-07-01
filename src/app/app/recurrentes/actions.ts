@@ -41,6 +41,7 @@ function formInput(formData: FormData): RecurrenceFormInput {
     businessUnitId: stringValue(formData, "businessUnitId"),
     projectId: optionalStringValue(formData, "projectId"),
     costCenterId: optionalStringValue(formData, "costCenterId"),
+    vendorId: optionalStringValue(formData, "vendorId"),
     frequency: stringValue(formData, "frequency") as RecurrenceFrequency,
     intervalDays: optionalStringValue(formData, "intervalDays"),
     dayOfMonth: optionalStringValue(formData, "dayOfMonth"),
@@ -62,7 +63,7 @@ async function requireRecurrenceManager() {
 }
 
 async function references(companyId: string, input: RecurrenceFormInput) {
-  const [accountingAccount, bankAccount, businessUnit, project, costCenter] = await Promise.all([
+  const [accountingAccount, bankAccount, businessUnit, project, costCenter, vendor] = await Promise.all([
     prisma.accountingAccount.findFirst({
       where: { id: input.accountingAccountId, companyId },
       include: { _count: { select: { children: true } } }
@@ -70,10 +71,11 @@ async function references(companyId: string, input: RecurrenceFormInput) {
     prisma.bankAccount.findFirst({ where: { id: input.bankAccountId, companyId } }),
     prisma.businessUnit.findFirst({ where: { id: input.businessUnitId, companyId } }),
     input.projectId ? prisma.project.findFirst({ where: { id: input.projectId, companyId } }) : Promise.resolve(null),
-    input.costCenterId ? prisma.costCenter.findFirst({ where: { id: input.costCenterId, companyId } }) : Promise.resolve(null)
+    input.costCenterId ? prisma.costCenter.findFirst({ where: { id: input.costCenterId, companyId } }) : Promise.resolve(null),
+    input.vendorId ? prisma.vendor.findFirst({ where: { id: input.vendorId, companyId } }) : Promise.resolve(null)
   ]);
 
-  return { accountingAccount, bankAccount, businessUnit, project, costCenter };
+  return { accountingAccount, bankAccount, businessUnit, project, costCenter, vendor };
 }
 
 async function audit(params: {
@@ -358,6 +360,7 @@ export async function updateRecurrenceAction(formData: FormData) {
           bankAccountId: saved.bankAccountId,
           projectId: saved.projectId,
           costCenterId: saved.costCenterId,
+          vendorId: saved.vendorId,
           type: saved.type,
           status: saved.status,
           description: saved.description,
@@ -531,6 +534,7 @@ export async function editThisAndFollowingAction(formData: FormData) {
         bankAccountId: data.bankAccountId,
         projectId: data.projectId,
         costCenterId: data.costCenterId,
+        vendorId: data.vendorId,
         type: data.type,
         description: data.description,
         amount: data.amount,
@@ -609,6 +613,7 @@ export async function editThisAndFollowingAction(formData: FormData) {
           bankAccountId: newRule.bankAccountId,
           projectId: newRule.projectId,
           costCenterId: newRule.costCenterId,
+          vendorId: newRule.vendorId,
           type: newRule.type,
           status: newRule.status,
           description: newRule.description,

@@ -33,6 +33,7 @@ export type RecurrenceFormInput = {
   businessUnitId: string;
   projectId: string | null;
   costCenterId: string | null;
+  vendorId: string | null;
   frequency: RecurrenceFrequency;
   intervalDays: string | null;
   dayOfMonth: string | null;
@@ -55,6 +56,7 @@ export type RecurrenceReference = {
   businessUnit?: { id: string; isActive: boolean; deletedAt: Date | null } | null;
   project?: { id: string; businessUnitId: string; isActive: boolean; deletedAt: Date | null } | null;
   costCenter?: { id: string; isActive: boolean; deletedAt: Date | null } | null;
+  vendor?: { id: string; isActive: boolean; deletedAt: Date | null } | null;
 };
 
 function optionalInteger(value: string | null, label: string, min: number, max: number): number | null {
@@ -144,6 +146,17 @@ export function validateRecurrenceInput(input: RecurrenceFormInput, refs: Recurr
     }
   }
 
+  if (input.vendorId && input.type !== "EXPENSE") {
+    throw new Error("El proveedor solo aplica a movimientos de Egreso.");
+  }
+
+  if (input.vendorId) {
+    const vendor = refs.vendor;
+    if (!vendor || vendor.deletedAt) {
+      throw new Error("El proveedor seleccionado no existe.");
+    }
+  }
+
   const startDate = parseRequiredDate(input.startDate);
   const endDate = parseOptionalDate(input.endDate);
 
@@ -180,6 +193,7 @@ export function validateRecurrenceInput(input: RecurrenceFormInput, refs: Recurr
     businessUnitId: input.businessUnitId,
     projectId: input.projectId,
     costCenterId: input.costCenterId,
+    vendorId: input.vendorId,
     frequency: input.frequency,
     intervalDays,
     dayOfMonth,

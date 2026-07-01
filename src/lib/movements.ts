@@ -33,6 +33,7 @@ export type MovementFormInput = {
   businessUnitId: string;
   projectId: string | null;
   costCenterId: string | null;
+  vendorId: string | null;
   projectedDate: string;
   realDate: string | null;
   status: MovementStatus;
@@ -51,6 +52,7 @@ export type MovementReference = {
   businessUnit?: { id: string; isActive: boolean; deletedAt: Date | null } | null;
   project?: { id: string; businessUnitId: string; isActive: boolean; deletedAt: Date | null } | null;
   costCenter?: { id: string; isActive: boolean; deletedAt: Date | null } | null;
+  vendor?: { id: string; isActive: boolean; deletedAt: Date | null } | null;
 };
 
 /** Estados que cuentan como "Atrasado": aun no se cobra/paga (ni siquiera parcial) y su fecha proyectada ya paso. */
@@ -190,6 +192,17 @@ export function validateMovementInput(input: MovementFormInput, refs: MovementRe
     }
   }
 
+  if (input.vendorId && input.type !== "EXPENSE") {
+    throw new Error("El proveedor solo aplica a movimientos de Egreso.");
+  }
+
+  if (input.vendorId) {
+    const vendor = refs.vendor;
+    if (!vendor || vendor.deletedAt) {
+      throw new Error("El proveedor seleccionado no existe.");
+    }
+  }
+
   return {
     type: input.type,
     accountingAccountId: input.accountingAccountId,
@@ -200,6 +213,7 @@ export function validateMovementInput(input: MovementFormInput, refs: MovementRe
     businessUnitId: input.businessUnitId,
     projectId: input.projectId,
     costCenterId: input.costCenterId,
+    vendorId: input.vendorId,
     projectedDate: parseRequiredDate(input.projectedDate),
     realDate: parseOptionalDate(input.realDate),
     status: input.status,

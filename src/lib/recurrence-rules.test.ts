@@ -12,7 +12,8 @@ const refs = {
   bankAccount: { id: "bank", isActive: true, deletedAt: null },
   businessUnit: { id: "unit", isActive: true, deletedAt: null },
   project: null,
-  costCenter: null
+  costCenter: null,
+  vendor: null
 };
 
 const input = {
@@ -27,6 +28,7 @@ const input = {
   businessUnitId: "unit",
   projectId: null,
   costCenterId: null,
+  vendorId: null,
   frequency: "MONTHLY" as const,
   intervalDays: null,
   dayOfMonth: "31",
@@ -49,6 +51,16 @@ describe("recurrence rule helpers", () => {
 
     expect(result.amount.toString()).toBe("250000");
     expect(result.dayOfMonth).toBe(31);
+  });
+
+  it("el proveedor solo aplica a recurrentes de Egreso y debe existir", () => {
+    const vendorRefs = { ...refs, vendor: { id: "vendor-1", isActive: true, deletedAt: null } };
+
+    expect(() => validateRecurrenceInput({ ...input, type: "INCOME", vendorId: "vendor-1" }, vendorRefs)).toThrow("Egreso");
+    expect(() => validateRecurrenceInput({ ...input, vendorId: "vendor-1" }, refs)).toThrow("no existe");
+
+    const result = validateRecurrenceInput({ ...input, vendorId: "vendor-1" }, vendorRefs);
+    expect(result.vendorId).toBe("vendor-1");
   });
 
   it("rejects invalid every N days forms", () => {

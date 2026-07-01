@@ -105,6 +105,7 @@ export async function generateMovementsForRecurrence(ruleId: string, options: Re
           bankAccountId: rule.bankAccountId,
           projectId: rule.projectId,
           costCenterId: rule.costCenterId,
+          vendorId: rule.vendorId,
           type: rule.type,
           status: rule.status,
           description: rule.description,

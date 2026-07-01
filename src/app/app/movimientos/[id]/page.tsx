@@ -14,7 +14,7 @@ import { canManageRecurrences } from "@/lib/recurrence-rules";
 import { prisma } from "@/lib/prisma";
 
 async function getReferenceData(companyId: string) {
-  const [accounts, businessUnits, bankAccounts, projects, costCenters] = await Promise.all([
+  const [accounts, businessUnits, bankAccounts, projects, costCenters, vendors] = await Promise.all([
     prisma.accountingAccount.findMany({
       where: { companyId, isActive: true, allowMovements: true, deletedAt: null, children: { none: {} } },
       orderBy: [{ code: "asc" }]
@@ -22,10 +22,11 @@ async function getReferenceData(companyId: string) {
     prisma.businessUnit.findMany({ where: { companyId, isActive: true, deletedAt: null }, orderBy: [{ name: "asc" }] }),
     prisma.bankAccount.findMany({ where: { companyId, isActive: true, deletedAt: null }, orderBy: [{ name: "asc" }] }),
     prisma.project.findMany({ where: { companyId, isActive: true, deletedAt: null }, orderBy: [{ name: "asc" }] }),
-    prisma.costCenter.findMany({ where: { companyId, isActive: true, deletedAt: null }, orderBy: [{ name: "asc" }] })
+    prisma.costCenter.findMany({ where: { companyId, isActive: true, deletedAt: null }, orderBy: [{ name: "asc" }] }),
+    prisma.vendor.findMany({ where: { companyId, isActive: true, deletedAt: null }, select: { id: true, name: true }, orderBy: [{ name: "asc" }] })
   ]);
 
-  return { accounts, businessUnits, bankAccounts, projects, costCenters };
+  return { accounts, businessUnits, bankAccounts, projects, costCenters, vendors };
 }
 
 export default async function MovimientoDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -105,6 +106,7 @@ export default async function MovimientoDetailPage({ params }: { params: Promise
               movement={movement}
               projects={referenceData.projects}
               submitLabel="Guardar"
+              vendors={referenceData.vendors}
             />
             <form action={cancelMovementAction} className="mt-3 flex flex-wrap gap-2">
               <input name="id" type="hidden" value={movement.id} />

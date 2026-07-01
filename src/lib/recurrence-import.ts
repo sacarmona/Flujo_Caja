@@ -342,6 +342,7 @@ export function resolveRecurrenceImportRow(
     businessUnitId: businessUnit!.id,
     projectId: project?.id ?? null,
     costCenterId: costCenter?.id ?? null,
+    vendorId: null,
     frequency: frequency as RecurrenceFrequency,
     intervalDays: get("Intervalo dias") || null,
     dayOfMonth: get("Dia del mes") || null,

@@ -21,6 +21,7 @@ const baseInput = {
   businessUnitId: "unit",
   projectId: null,
   costCenterId: null,
+  vendorId: null,
   projectedDate: "2026-06-18",
   realDate: null,
   status: "PROJECTED" as const,
@@ -38,7 +39,8 @@ const activeRefs = {
   bankAccount: { id: "bank", isActive: true, deletedAt: null },
   businessUnit: { id: "unit", isActive: true, deletedAt: null },
   project: null,
-  costCenter: null
+  costCenter: null,
+  vendor: null
 };
 
 describe("movement rules", () => {
@@ -116,5 +118,15 @@ describe("movement rules", () => {
     expect(isLateMovement({ status: "PARTIALLY_PAID", projectedDate: new Date(2026, 5, 19) }, today)).toBe(false);
     expect(isLateMovement({ status: "PAID_OR_COLLECTED", projectedDate: new Date(2026, 5, 19) }, today)).toBe(false);
     expect(isLateMovement({ status: "CANCELLED", projectedDate: new Date(2026, 5, 19) }, today)).toBe(false);
+  });
+
+  it("el proveedor solo aplica a movimientos de Egreso y debe existir", () => {
+    const vendorRefs = { ...activeRefs, vendor: { id: "vendor-1", isActive: true, deletedAt: null } };
+
+    expect(() => validateMovementInput({ ...baseInput, type: "INCOME", vendorId: "vendor-1" }, vendorRefs)).toThrow("Egreso");
+    expect(() => validateMovementInput({ ...baseInput, type: "EXPENSE", vendorId: "vendor-1" }, activeRefs)).toThrow("no existe");
+
+    const result = validateMovementInput({ ...baseInput, type: "EXPENSE", vendorId: "vendor-1" }, vendorRefs);
+    expect(result.vendorId).toBe("vendor-1");
   });
 });
