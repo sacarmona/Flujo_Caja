@@ -7,7 +7,7 @@ import { WeeklyMovementsTable } from "@/app/app/movimientos/weekly-movements-tab
 import { Pagination } from "@/components/pagination";
 import { SavedBanner } from "@/components/saved-banner";
 import { calculateSantanderCashFlow } from "@/lib/cash-flow-service";
-import { weeklyAccumulatedBalances } from "@/lib/calendar-view";
+import { mondayOfWeek, weeklyAccumulatedBalances } from "@/lib/calendar-view";
 import { formatCurrency, todayInAppTimeZone } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { getHolidayKeys } from "@/lib/holidays-cl";
@@ -27,6 +27,7 @@ type SearchParams = {
   businessUnitId?: string;
   recurrenceRuleId?: string;
   late?: string;
+  range?: string;
 };
 
 type MovimientosPageProps = {
@@ -83,8 +84,24 @@ async function getReferenceData(companyId: string) {
   return { accounts, businessUnits, bankAccounts, projects, costCenters, vendors };
 }
 
+/**
+ * Por defecto ("current", incluido cuando el parametro viene ausente) el
+ * listado oculta semanas anteriores a la actual, para no tener que avanzar
+ * paginas hasta llegar a la semana en curso. Se desactiva con range=all, o
+ * automaticamente si el usuario ya escribio un "Desde" propio (mas
+ * especifico que el filtro por defecto) o marco "Solo atrasados" (que
+ * justamente busca movimientos de antes de hoy sin gestionar).
+ */
+function currentWeekFloor(filters: SearchParams, late: boolean): Date | null {
+  if (filters.range === "all" || filters.from || late) {
+    return null;
+  }
+  return mondayOfWeek(todayInAppTimeZone());
+}
+
 function movementsWhere(companyId: string, filters: SearchParams) {
   const late = filters.late === "true";
+  const weekFloor = currentWeekFloor(filters, late);
   return {
     companyId,
     deletedAt: null,
@@ -93,12 +110,13 @@ function movementsWhere(companyId: string, filters: SearchParams) {
     ...(filters.accountingAccountId ? { accountingAccountId: filters.accountingAccountId } : {}),
     ...(filters.businessUnitId ? { businessUnitId: filters.businessUnitId } : {}),
     ...(filters.recurrenceRuleId ? { recurrenceRuleId: filters.recurrenceRuleId } : {}),
-    ...(filters.from || filters.to || late
+    ...(filters.from || filters.to || late || weekFloor
       ? {
           projectedDate: {
             ...(filters.from ? { gte: new Date(`${filters.from}T00:00:00.000`) } : {}),
             ...(filters.to ? { lte: new Date(`${filters.to}T23:59:59.999`) } : {}),
-            ...(late ? { lt: todayInAppTimeZone() } : {})
+            ...(late ? { lt: todayInAppTimeZone() } : {}),
+            ...(weekFloor ? { gte: weekFloor } : {})
           }
         }
       : {})
@@ -212,7 +230,14 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
         </p>
       </div>
 
-      <form className="mt-6 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-8">
+      <form className="mt-6 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-9">
+        <label className="text-sm">
+          <span className="mb-1 block text-slate-600">Rango</span>
+          <select className="w-full rounded-md border border-slate-300 px-2 py-2" name="range" defaultValue={filters.range === "all" ? "all" : "current"}>
+            <option value="current">Semana en curso en adelante</option>
+            <option value="all">Todo el historico</option>
+          </select>
+        </label>
         <label className="text-sm">
           <span className="mb-1 block text-slate-600">Desde</span>
           <input className="w-full rounded-md border border-slate-300 px-2 py-2" name="from" type="date" defaultValue={filters.from ?? ""} />
