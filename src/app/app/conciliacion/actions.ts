@@ -207,7 +207,7 @@ export async function uploadBankStatementAction(formData: FormData) {
           }
         });
       }
-    });
+    }, { timeout: 60000, maxWait: 10000 });
   } catch (error) {
     return redirectWithError("/app/conciliacion", error instanceof Error ? error.message : "No se pudo importar la cartola.");
   }
