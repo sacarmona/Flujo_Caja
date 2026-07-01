@@ -209,4 +209,22 @@ describe("validateSplitAllocations", () => {
       ])
     ).toThrow("debe ser exactamente igual");
   });
+
+  it("acepta montos con decimales (conversion de moneda) si la suma redondeada a entero calza con la fila", () => {
+    expect(() =>
+      validateSplitAllocations(bankRow, [
+        { movementId: "mov-1", amount: new Prisma.Decimal("500000.3") },
+        { movementId: "mov-2", amount: new Prisma.Decimal("999999.8") }
+      ])
+    ).not.toThrow();
+  });
+
+  it("rechaza montos con decimales si la suma redondeada a entero no calza con la fila", () => {
+    expect(() =>
+      validateSplitAllocations(bankRow, [
+        { movementId: "mov-1", amount: new Prisma.Decimal("500000.3") },
+        { movementId: "mov-2", amount: new Prisma.Decimal("999998.8") }
+      ])
+    ).toThrow("debe ser exactamente igual");
+  });
 });

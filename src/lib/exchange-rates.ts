@@ -60,9 +60,16 @@ function positiveRate(value: string): Prisma.Decimal {
   return rate;
 }
 
-/** El CLP no tiene decimales (no existen centavos de peso); redondear a entero evita que la conciliacion exacta contra montos de cartola bancaria (siempre enteros) falle por diferencias de centesimas. */
+/**
+ * Se conserva el decimal resultante de aplicar la tasa de cambio (no se
+ * redondea a entero aqui): redondear cada movimiento por separado antes de
+ * sumarlos en una conciliacion dividida acumula error y la suma final puede
+ * no calzar con el monto entero de la cartola. El redondeo a entero se
+ * aplica solo una vez, sobre la suma final, al comparar contra la cartola
+ * (ver validateSplitAllocations en reconciliation.ts).
+ */
 export function clpAmount(amount: Prisma.Decimal | number | string, rate: Prisma.Decimal): Prisma.Decimal {
-  return decimal(amount).mul(rate).toDecimalPlaces(0);
+  return decimal(amount).mul(rate).toDecimalPlaces(2);
 }
 
 export async function resolveConversion(input: ConversionInput): Promise<ConversionResult> {

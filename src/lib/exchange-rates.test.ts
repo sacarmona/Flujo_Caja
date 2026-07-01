@@ -17,7 +17,7 @@ describe("exchange conversion", () => {
     expect(result.projectedAmountClp.toString()).toBe("1234");
   });
 
-  it("redondea a entero (el CLP no tiene decimales) para que calce exacto contra montos de cartola bancaria", async () => {
+  it("conserva 2 decimales al convertir (no redondea a entero por movimiento; ver validateSplitAllocations para el redondeo de la suma)", async () => {
     const result = await resolveConversion({
       amount: "3",
       currency: "UF",
@@ -25,7 +25,7 @@ describe("exchange conversion", () => {
       provider: new StaticExchangeRateProvider({ UF: "38123.456" })
     });
 
-    expect(result.projectedAmountClp.toString()).toBe("114370");
+    expect(result.projectedAmountClp.toString()).toBe("114370.37");
   });
 
   it("converts UF", async () => {

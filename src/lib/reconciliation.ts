@@ -66,7 +66,14 @@ export function validateSplitAllocations(
 
   const total = allocations.reduce((sum, allocation) => sum.plus(allocation.amount), new Prisma.Decimal(0));
   const bankAmount = bankRow.amount.abs();
-  if (!total.eq(bankAmount)) {
+  /**
+   * Los montos individuales conservan los decimales de la conversion de
+   * moneda (ver clpAmount en exchange-rates.ts); el redondeo a entero (el
+   * CLP no tiene decimales) se aplica una sola vez, sobre la suma final, en
+   * vez de a cada movimiento por separado, para no acumular error de
+   * redondeo contra el monto entero de la cartola bancaria.
+   */
+  if (!total.toDecimalPlaces(0).eq(bankAmount)) {
     throw new Error(`La suma asignada (${total.toString()}) debe ser exactamente igual al monto de la fila bancaria (${bankAmount.toString()}).`);
   }
 }
