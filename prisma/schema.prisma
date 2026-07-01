@@ -527,9 +527,12 @@ model BankMovement {
   reference             String?
   createdAt             DateTime         @default(now())
 
-  batch          BankImportBatch @relation(fields: [batchId], references: [id])
-  bankAccount    BankAccount     @relation(fields: [bankAccountId], references: [id])
-  reconciliation Reconciliation?
+  batch           BankImportBatch  @relation(fields: [batchId], references: [id])
+  bankAccount     BankAccount      @relation(fields: [bankAccountId], references: [id])
+  /// Normalmente 1 sola (caso mas comun), pero puede haber varias cuando el
+  /// monto de esta fila se distribuye entre varios movimientos (ej. un
+  /// cliente paga varias facturas en una sola transferencia).
+  reconciliations Reconciliation[]
 
   @@index([batchId])
   @@index([bankAccountId])
@@ -541,9 +544,14 @@ enum ReconciliationMatchLevel {
   NONE
 }
 
+/// bankMovementId ya no es unico: una fila de cartola puede repartirse entre
+/// varios movimientos (ver splitReconciliationAction), cada reparto con su
+/// propia fila de Reconciliation/Payment. El caso 1:1 tradicional (la gran
+/// mayoria) sigue siendo exactamente una fila por BankMovement, igual que
+/// antes.
 model Reconciliation {
   id             String                   @id @default(cuid())
-  bankMovementId String                   @unique
+  bankMovementId String
   movementId     String?
   paymentId      String?                  @unique
   matchLevel     ReconciliationMatchLevel
@@ -561,4 +569,5 @@ model Reconciliation {
   confirmedBy  User?        @relation(fields: [confirmedById], references: [id])
 
   @@index([movementId])
+  @@index([bankMovementId])
 }

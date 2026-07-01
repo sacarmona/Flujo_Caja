@@ -15,8 +15,10 @@ import {
   matchBankRow,
   movementTypeForBankType,
   partitionAlreadyReconciled,
+  validateSplitAllocations,
   type ConfirmedBankRow,
-  type ReconciliationCandidate
+  type ReconciliationCandidate,
+  type SplitAllocation
 } from "@/lib/reconciliation";
 import { redirectSaved, redirectWithError } from "@/lib/saved-redirect";
 
@@ -78,7 +80,7 @@ async function loadConfirmedBankRows(companyId: string, bankAccountId: string, r
       bankAccountId,
       batch: { companyId },
       date: { gte: new Date(Math.min(...dates)), lte: new Date(Math.max(...dates)) },
-      reconciliation: { confirmed: true }
+      reconciliations: { some: { confirmed: true } }
     },
     select: { date: true, amount: true, type: true, reference: true }
   });
@@ -285,6 +287,82 @@ export async function confirmReconciliationAction(formData: FormData) {
   await redirectSaved("/app/conciliacion");
 }
 
+/**
+ * Distribuye una fila de cartola entre varios movimientos (ej. un cliente
+ * paga varias facturas en una sola transferencia): reemplaza la fila de
+ * conciliacion pendiente (sin confirmar) por N filas nuevas, una por cada
+ * movimiento elegido, cada una con su propio Payment y ya confirmada -no
+ * queda un paso extra de "Confirmar" despues de elegir la distribucion.
+ *
+ * Los campos vienen del formulario como pares "movementIds" (checkbox,
+ * multivalor) + "amount_<movementId>" (monto asignado a ese movimiento).
+ */
+export async function splitReconciliationAction(formData: FormData) {
+  const user = await requireReconciliationManager();
+  const reconciliationId = stringValue(formData, "reconciliationId");
+  const selectedMovementIds = formData.getAll("movementIds").map(String);
+
+  const allocations: SplitAllocation[] = selectedMovementIds.map((movementId) => ({
+    movementId,
+    amount: new Prisma.Decimal(stringValue(formData, `amount_${movementId}`).replace(",", ".") || "0")
+  }));
+
+  await prisma.$transaction(async (tx) => {
+    const reconciliation = await tx.reconciliation.findFirst({
+      where: { id: reconciliationId, bankMovement: { bankAccount: { companyId: user.companyId } } },
+      include: { bankMovement: true }
+    });
+    if (!reconciliation || reconciliation.confirmed || reconciliation.reversed) {
+      throw new Error("La conciliacion no existe o ya fue procesada.");
+    }
+
+    validateSplitAllocations(reconciliation.bankMovement, allocations);
+
+    const expectedType = movementTypeForBankType(reconciliation.bankMovement.type);
+    const movements = await tx.movement.findMany({
+      where: { id: { in: allocations.map((allocation) => allocation.movementId) }, companyId: user.companyId, deletedAt: null }
+    });
+    if (movements.length !== allocations.length) {
+      throw new Error("Alguno de los movimientos seleccionados no existe.");
+    }
+    if (movements.some((movement) => movement.type !== expectedType)) {
+      throw new Error("Todos los movimientos seleccionados deben ser del mismo tipo que la fila bancaria.");
+    }
+
+    // Se reemplaza la fila placeholder (sin confirmar, matchLevel NONE/POSSIBLE) por las N filas del reparto.
+    await tx.reconciliation.delete({ where: { id: reconciliation.id } });
+
+    const referenceNote = `Conciliacion banco (dividida)${reconciliation.bankMovement.reference ? ` - Doc. ${reconciliation.bankMovement.reference}` : ""}`;
+    for (const allocation of allocations) {
+      const payment = await registerReconciliationPayment({
+        tx,
+        userId: user.id,
+        companyId: user.companyId,
+        movementId: allocation.movementId,
+        amount: allocation.amount,
+        paidAt: reconciliation.bankMovement.date,
+        reference: referenceNote
+      });
+
+      await tx.reconciliation.create({
+        data: {
+          bankMovementId: reconciliation.bankMovementId,
+          movementId: allocation.movementId,
+          paymentId: payment.id,
+          matchLevel: "HIGH",
+          confirmed: true,
+          confirmedById: user.id,
+          confirmedAt: new Date()
+        }
+      });
+    }
+  });
+
+  revalidatePath("/app/conciliacion");
+  revalidatePath("/app/movimientos");
+  await redirectSaved("/app/conciliacion");
+}
+
 export async function createMovementFromBankRowAction(formData: FormData) {
   const user = await requireReconciliationManager();
   const reconciliationId = stringValue(formData, "reconciliationId");
@@ -477,13 +555,13 @@ export async function cancelImportBatchAction(formData: FormData) {
   await prisma.$transaction(async (tx) => {
     const batch = await tx.bankImportBatch.findFirst({
       where: { id: batchId, companyId: user.companyId },
-      include: { bankMovements: { include: { reconciliation: true } } }
+      include: { bankMovements: { include: { reconciliations: true } } }
     });
     if (!batch) {
       throw new Error("La importacion no existe.");
     }
 
-    const unconfirmed = batch.bankMovements.filter((row) => !row.reconciliation?.confirmed);
+    const unconfirmed = batch.bankMovements.filter((row) => !row.reconciliations.some((reconciliation) => reconciliation.confirmed));
     for (const row of unconfirmed) {
       await deleteUnconfirmedBankMovement(tx, row.id);
     }

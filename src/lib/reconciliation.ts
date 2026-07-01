@@ -29,6 +29,48 @@ export type BankRowMatch = {
   candidates: ReconciliationCandidate[];
 };
 
+export type SplitAllocation = {
+  movementId: string;
+  amount: Prisma.Decimal;
+};
+
+/**
+ * Valida la distribucion de una fila de cartola entre varios movimientos
+ * (ej. un cliente paga varias facturas en una sola transferencia): exige al
+ * menos 2 movimientos distintos, montos positivos, y que la suma calce
+ * EXACTO con el monto de la fila (sin remanente, version inicial de esta
+ * funcionalidad). No valida aqui el tipo de cada movimiento ni que el monto
+ * quepa en su saldo pendiente -eso lo hace el llamador con datos frescos de
+ * la base de datos (ver splitReconciliationAction), evitando duplicar logica
+ * con un candidate list que podria quedar desactualizado entre el render y
+ * el envio del formulario.
+ */
+export function validateSplitAllocations(
+  bankRow: { amount: Prisma.Decimal; type: BankMovementType },
+  allocations: SplitAllocation[]
+): void {
+  if (allocations.length < 2) {
+    throw new Error("Selecciona al menos 2 movimientos para distribuir esta fila.");
+  }
+
+  const uniqueMovementIds = new Set(allocations.map((allocation) => allocation.movementId));
+  if (uniqueMovementIds.size !== allocations.length) {
+    throw new Error("No puedes seleccionar el mismo movimiento mas de una vez.");
+  }
+
+  for (const allocation of allocations) {
+    if (!allocation.amount.isFinite() || allocation.amount.lte(0)) {
+      throw new Error("Cada monto asignado debe ser positivo.");
+    }
+  }
+
+  const total = allocations.reduce((sum, allocation) => sum.plus(allocation.amount), new Prisma.Decimal(0));
+  const bankAmount = bankRow.amount.abs();
+  if (!total.eq(bankAmount)) {
+    throw new Error(`La suma asignada (${total.toString()}) debe ser exactamente igual al monto de la fila bancaria (${bankAmount.toString()}).`);
+  }
+}
+
 export function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }

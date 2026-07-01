@@ -12,6 +12,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { canModifyMovements } from "@/lib/movements";
 import { canManageRecurrences, serializeRecurrenceForForm } from "@/lib/recurrence-rules";
 import { prisma } from "@/lib/prisma";
+import { refererHref } from "@/lib/saved-redirect";
 
 async function getReferenceData(companyId: string) {
   const [accounts, businessUnits, bankAccounts, projects, costCenters, vendors] = await Promise.all([
@@ -46,7 +47,13 @@ export default async function MovimientoDetailPage({ params }: { params: Promise
     notFound();
   }
 
-  const [referenceData, defaults] = await Promise.all([getReferenceData(user.companyId), getMovementDefaults(user.companyId)]);
+  const [referenceData, defaults, backHref] = await Promise.all([
+    getReferenceData(user.companyId),
+    getMovementDefaults(user.companyId),
+    refererHref("/app/movimientos")
+  ]);
+  // Solo se preservan filtros si realmente se vino desde el listado (ej. no desde Calendario u otra vista).
+  const backToMovimientosHref = backHref.split("?")[0] === "/app/movimientos" ? backHref : "/app/movimientos";
   const canWrite = canModifyMovements(user.role);
   const canManageRecurrence = canManageRecurrences(user.role);
   const recurrenceRule =
@@ -57,7 +64,7 @@ export default async function MovimientoDetailPage({ params }: { params: Promise
   return (
     <section className="max-w-5xl">
       <SavedBanner />
-      <Link className="text-sm font-semibold text-adentu-blue hover:underline" href="/app/movimientos">
+      <Link className="text-sm font-semibold text-adentu-blue hover:underline" href={backToMovimientosHref}>
         ← Volver a Movimientos
       </Link>
 

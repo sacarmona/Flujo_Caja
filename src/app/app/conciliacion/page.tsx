@@ -9,9 +9,11 @@ import {
   discardBankMovementAction,
   loadCandidates,
   reverseReconciliationAction,
+  splitReconciliationAction,
   uploadBankStatementAction
 } from "./actions";
 import { optionLabel } from "../movimientos/shared";
+import { AmountInput } from "@/components/amount-input";
 import { ErrorBanner } from "@/components/error-banner";
 import { SavedBanner } from "@/components/saved-banner";
 import { formatCurrency } from "@/lib/format";
@@ -53,7 +55,7 @@ export default async function ConciliacionPage() {
       bankMovements: {
         orderBy: { date: "desc" },
         include: {
-          reconciliation: {
+          reconciliations: {
             include: {
               movement: { include: { payments: true } },
               confirmedBy: true,
@@ -73,8 +75,10 @@ export default async function ConciliacionPage() {
 
   const referenceData = canManage ? await getReferenceData(user.companyId) : null;
 
-  const pendingRows = (latestBatch?.bankMovements ?? []).filter((row) => !row.reconciliation?.confirmed && !row.reconciliation?.reversed);
-  const resolvedRows = (latestBatch?.bankMovements ?? []).filter((row) => row.reconciliation?.confirmed || row.reconciliation?.reversed);
+  const isRowResolved = (row: { reconciliations: { confirmed: boolean; reversed: boolean }[] }) =>
+    row.reconciliations.some((reconciliation) => reconciliation.confirmed || reconciliation.reversed);
+  const pendingRows = (latestBatch?.bankMovements ?? []).filter((row) => !isRowResolved(row));
+  const resolvedRows = (latestBatch?.bankMovements ?? []).filter(isRowResolved);
 
   return (
     <section className="max-w-5xl space-y-8">
@@ -140,6 +144,8 @@ export default async function ConciliacionPage() {
               const live = matchBankRow(row, candidates);
               const expectedType = movementTypeForBankType(row.type);
               const matchingAccounts = referenceData?.accounts.filter((account) => accountMatchesMovementType(account.type, expectedType)) ?? [];
+              const splitCandidates = candidates.filter((candidate) => candidate.type === expectedType);
+              const reconciliationId = row.reconciliations[0]?.id;
 
               return (
                 <div className="rounded-lg border border-slate-200 bg-white p-4" key={row.id}>
@@ -156,7 +162,7 @@ export default async function ConciliacionPage() {
                       </p>
                       {canManage ? (
                         <form action={discardBankMovementAction}>
-                          <input name="reconciliationId" type="hidden" value={row.reconciliation?.id} />
+                          <input name="reconciliationId" type="hidden" value={reconciliationId} />
                           <button className="text-xs font-semibold text-slate-500 underline hover:text-red-700" type="submit">
                             Descartar
                           </button>
@@ -172,7 +178,7 @@ export default async function ConciliacionPage() {
                       </p>
                       {canManage ? (
                         <form action={confirmReconciliationAction}>
-                          <input name="reconciliationId" type="hidden" value={row.reconciliation?.id} />
+                          <input name="reconciliationId" type="hidden" value={reconciliationId} />
                           <input name="movementId" type="hidden" value={live.movementId} />
                           <button className="rounded-md bg-adentu-teal px-3 py-1.5 text-xs font-semibold text-white" type="submit">
                             Confirmar Pagado/Cobrado
@@ -187,7 +193,7 @@ export default async function ConciliacionPage() {
                       <p className="mb-2">Hay {live.candidates.length} movimiento(s) con el mismo monto pendiente, pero la fecha no coincide exacto. Elige cual corresponde:</p>
                       {canManage ? (
                         <form action={confirmReconciliationAction} className="flex flex-wrap items-end gap-2">
-                          <input name="reconciliationId" type="hidden" value={row.reconciliation?.id} />
+                          <input name="reconciliationId" type="hidden" value={reconciliationId} />
                           <select className="rounded-md border border-amber-300 px-2 py-1.5 text-sm" defaultValue={live.movementId ?? ""} name="movementId" required>
                             <option disabled value="">
                               Selecciona un movimiento
@@ -211,7 +217,7 @@ export default async function ConciliacionPage() {
                       <p className="mb-2">No existe ningun movimiento pendiente con ese monto. Crealo y quedara directamente Pagado/Cobrado.</p>
                       {canManage && referenceData ? (
                         <form action={createMovementFromBankRowAction} className="grid gap-2 sm:grid-cols-2">
-                          <input name="reconciliationId" type="hidden" value={row.reconciliation?.id} />
+                          <input name="reconciliationId" type="hidden" value={reconciliationId} />
                           <label className="text-xs">
                             <span className="mb-1 block text-slate-600">Cuenta contable</span>
                             <select className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm" name="accountingAccountId" required>
@@ -263,6 +269,39 @@ export default async function ConciliacionPage() {
                       ) : null}
                     </div>
                   ) : null}
+
+                  {canManage && splitCandidates.length >= 2 ? (
+                    <details className="mt-3">
+                      <summary className="cursor-pointer text-xs font-semibold text-adentu-blue">
+                        Distribuir entre varios movimientos (ej. un cliente pago varias facturas juntas)
+                      </summary>
+                      <form action={splitReconciliationAction} className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+                        <input name="reconciliationId" type="hidden" value={reconciliationId} />
+                        <p className="mb-2 text-xs text-slate-600">
+                          Marca los movimientos que corresponden a esta fila y el monto exacto de cada uno. La suma debe ser igual a{" "}
+                          {formatCurrency(Number(row.amount.abs()))}.
+                        </p>
+                        <div className="space-y-1.5">
+                          {splitCandidates.map((candidate) => (
+                            <label className="flex flex-wrap items-center gap-2" key={candidate.movementId}>
+                              <input name="movementIds" type="checkbox" value={candidate.movementId} />
+                              <span className="min-w-0 flex-1 truncate">
+                                {candidate.description} · {formatDate(candidate.projectedDate)} · pendiente {formatCurrency(Number(candidate.pending))}
+                              </span>
+                              <AmountInput
+                                className="w-32 rounded-md border border-slate-300 px-2 py-1 text-right text-sm"
+                                name={`amount_${candidate.movementId}`}
+                                placeholder="$0"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                        <button className="mt-2 rounded-md bg-adentu-blue px-3 py-1.5 text-xs font-semibold text-white" type="submit">
+                          Distribuir y confirmar
+                        </button>
+                      </form>
+                    </details>
+                  ) : null}
                 </div>
               );
             })}
@@ -291,31 +330,40 @@ export default async function ConciliacionPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {resolvedRows.map((row) => (
-                      <tr className="border-t border-slate-200" key={row.id}>
-                        <td className="px-3 py-2 text-slate-600">{formatDate(row.date)}</td>
-                        <td className="px-3 py-2 text-slate-600">{row.description}</td>
-                        <td className="px-3 py-2 text-right text-slate-600">{formatCurrency(Number(row.amount))}</td>
-                        <td className="px-3 py-2">
-                          {row.reconciliation?.reversed ? (
-                            <span className="rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-700">Revertida</span>
-                          ) : (
-                            <span className="rounded bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">Conciliada</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-slate-600">{row.reconciliation?.movement?.description ?? "-"}</td>
-                        <td className="px-3 py-2">
-                          {canManage && row.reconciliation?.confirmed && !row.reconciliation?.reversed ? (
-                            <form action={reverseReconciliationAction}>
-                              <input name="reconciliationId" type="hidden" value={row.reconciliation.id} />
-                              <button className="text-xs font-semibold text-red-700 underline" type="submit">
-                                Revertir
-                              </button>
-                            </form>
-                          ) : null}
-                        </td>
-                      </tr>
-                    ))}
+                    {resolvedRows.flatMap((row) => {
+                      const resolvedLegs = row.reconciliations.filter((reconciliation) => reconciliation.confirmed || reconciliation.reversed);
+                      const isSplit = resolvedLegs.length > 1;
+                      return resolvedLegs.map((reconciliation) => (
+                        <tr className="border-t border-slate-200" key={reconciliation.id}>
+                          <td className="px-3 py-2 text-slate-600">{formatDate(row.date)}</td>
+                          <td className="px-3 py-2 text-slate-600">
+                            {row.description}
+                            {isSplit ? <span className="ml-1 text-xs text-slate-400">(dividida)</span> : null}
+                          </td>
+                          <td className="px-3 py-2 text-right text-slate-600">
+                            {formatCurrency(Number(reconciliation.payment?.amount ?? row.amount))}
+                          </td>
+                          <td className="px-3 py-2">
+                            {reconciliation.reversed ? (
+                              <span className="rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-700">Revertida</span>
+                            ) : (
+                              <span className="rounded bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">Conciliada</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-slate-600">{reconciliation.movement?.description ?? "-"}</td>
+                          <td className="px-3 py-2">
+                            {canManage && reconciliation.confirmed && !reconciliation.reversed ? (
+                              <form action={reverseReconciliationAction}>
+                                <input name="reconciliationId" type="hidden" value={reconciliation.id} />
+                                <button className="text-xs font-semibold text-red-700 underline" type="submit">
+                                  Revertir
+                                </button>
+                              </form>
+                            ) : null}
+                          </td>
+                        </tr>
+                      ));
+                    })}
                   </tbody>
                 </table>
               </div>

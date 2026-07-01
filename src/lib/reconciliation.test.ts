@@ -6,6 +6,7 @@ import {
   isAlreadyReconciled,
   matchBankRow,
   partitionAlreadyReconciled,
+  validateSplitAllocations,
   type ConfirmedBankRow,
   type ReconciliationCandidate
 } from "./reconciliation";
@@ -155,5 +156,57 @@ describe("partitionAlreadyReconciled", () => {
 
     expect(result.alreadyReconciledCount).toBe(1);
     expect(result.newRows).toEqual([newRow]);
+  });
+});
+
+describe("validateSplitAllocations", () => {
+  const bankRow = { amount: new Prisma.Decimal(-1500000), type: "CARGO" as const };
+
+  it("acepta una distribucion valida cuya suma calza exacto con el monto de la fila", () => {
+    expect(() =>
+      validateSplitAllocations(bankRow, [
+        { movementId: "mov-1", amount: new Prisma.Decimal(500000) },
+        { movementId: "mov-2", amount: new Prisma.Decimal(500000) },
+        { movementId: "mov-3", amount: new Prisma.Decimal(500000) }
+      ])
+    ).not.toThrow();
+  });
+
+  it("exige al menos 2 movimientos", () => {
+    expect(() => validateSplitAllocations(bankRow, [{ movementId: "mov-1", amount: new Prisma.Decimal(1500000) }])).toThrow("al menos 2");
+    expect(() => validateSplitAllocations(bankRow, [])).toThrow("al menos 2");
+  });
+
+  it("rechaza movimientos repetidos", () => {
+    expect(() =>
+      validateSplitAllocations(bankRow, [
+        { movementId: "mov-1", amount: new Prisma.Decimal(500000) },
+        { movementId: "mov-1", amount: new Prisma.Decimal(1000000) }
+      ])
+    ).toThrow("mas de una vez");
+  });
+
+  it("rechaza montos no positivos", () => {
+    expect(() =>
+      validateSplitAllocations(bankRow, [
+        { movementId: "mov-1", amount: new Prisma.Decimal(1500000) },
+        { movementId: "mov-2", amount: new Prisma.Decimal(0) }
+      ])
+    ).toThrow("positivo");
+    expect(() =>
+      validateSplitAllocations(bankRow, [
+        { movementId: "mov-1", amount: new Prisma.Decimal(-500) },
+        { movementId: "mov-2", amount: new Prisma.Decimal(1500500) }
+      ])
+    ).toThrow("positivo");
+  });
+
+  it("rechaza cuando la suma no calza exacto con el monto de la fila (sin remanente permitido)", () => {
+    expect(() =>
+      validateSplitAllocations(bankRow, [
+        { movementId: "mov-1", amount: new Prisma.Decimal(500000) },
+        { movementId: "mov-2", amount: new Prisma.Decimal(500001) }
+      ])
+    ).toThrow("debe ser exactamente igual");
   });
 });

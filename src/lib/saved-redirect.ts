@@ -58,3 +58,30 @@ export async function redirectWithError(fallbackPath: string, message: string): 
 
   redirect(`${target}?error=${encodeURIComponent(message)}`);
 }
+
+/**
+ * Igual idea que redirectSaved/redirectWithError, pero para un link "Volver"
+ * dentro del render normal de una pagina (no una server action): lee el
+ * header Referer para que "Volver a Movimientos" regrese a la misma pagina y
+ * filtros desde donde se navego (ej. Ver de la fila N con Estado=Pendiente),
+ * en vez de siempre caer al listado sin filtros. Solo confia en el Referer
+ * si coincide con el host de la app, para evitar un open redirect.
+ */
+export async function refererHref(fallbackPath: string): Promise<string> {
+  const requestHeaders = await headers();
+  const referer = requestHeaders.get("referer");
+  const host = requestHeaders.get("host");
+
+  if (referer && host) {
+    try {
+      const url = new URL(referer);
+      if (url.host === host) {
+        return `${url.pathname}${url.search}`;
+      }
+    } catch {
+      // Referer malformado: se usa fallbackPath.
+    }
+  }
+
+  return fallbackPath;
+}
