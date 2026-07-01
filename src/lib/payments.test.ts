@@ -10,6 +10,7 @@ import {
 
 const movement = {
   amount: "100000",
+  projectedAmountClp: "100000",
   currency: "CLP" as const,
   status: "PENDING" as const,
   cancelledAt: null,
@@ -60,5 +61,21 @@ describe("payment rules", () => {
     const payments = [{ amount: "30000" }, { amount: "70000", cancelledAt: new Date("2026-06-21T00:00:00.000Z") }];
 
     expect(statusFromPayments(movement.amount, payments)).toBe("PARTIALLY_PAID");
+  });
+
+  it("allows paying a foreign-currency movement using its CLP equivalent (projectedAmountClp)", () => {
+    const foreignMovement = {
+      amount: "1000",
+      projectedAmountClp: "950000",
+      currency: "USD" as const,
+      status: "PENDING" as const,
+      cancelledAt: null,
+      deletedAt: null
+    };
+
+    const amount = validatePaymentAmount({ movement: foreignMovement, existingPayments: [], amount: "950000" });
+
+    expect(amount.toString()).toBe("950000");
+    expect(statusFromPayments(foreignMovement.projectedAmountClp, [{ amount }])).toBe("PAID_OR_COLLECTED");
   });
 });

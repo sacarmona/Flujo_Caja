@@ -10,6 +10,8 @@ export type PaymentLike = {
 
 export type PayableMovement = {
   amount: Prisma.Decimal | number | string;
+  /** Los Payment siempre se registran en CLP (ver Payment.currency), asi que el saldo pendiente se compara en CLP, no en la moneda original del movimiento. */
+  projectedAmountClp: Prisma.Decimal | number | string;
   currency: Currency;
   status: MovementStatus;
   cancelledAt?: Date | null;
@@ -51,15 +53,20 @@ export function assertCanRegisterPayment(role: Role): void {
   assertCanModifyMovements(role);
 }
 
+/**
+ * Los pagos siempre se registran en CLP (Payment.currency es fijo "CLP"),
+ * asi que un movimiento en otra moneda tambien puede recibir pagos: se
+ * compara contra su projectedAmountClp (su equivalente en CLP segun la tasa
+ * de cambio del movimiento), no contra su monto en la moneda original. Si
+ * el monto real liquidado por el banco no calza con esa tasa referencial,
+ * el usuario debe corregir la tasa del movimiento antes de conciliar (no se
+ * ajusta automaticamente por ahora).
+ */
 export function validatePaymentAmount(params: {
   movement: PayableMovement;
   existingPayments: PaymentLike[];
   amount: string;
 }): Prisma.Decimal {
-  if (params.movement.currency !== "CLP") {
-    throw new Error("Por ahora solo se registran pagos en CLP.");
-  }
-
   if (params.movement.status === "CANCELLED" || params.movement.cancelledAt || params.movement.deletedAt) {
     throw new Error("No se pueden registrar pagos en movimientos cancelados.");
   }
@@ -70,7 +77,7 @@ export function validatePaymentAmount(params: {
     throw new Error("El monto del pago debe ser positivo.");
   }
 
-  const pending = pendingBalance(params.movement.amount, params.existingPayments);
+  const pending = pendingBalance(params.movement.projectedAmountClp, params.existingPayments);
 
   if (amount.gt(pending)) {
     throw new Error("El pago no puede superar el saldo pendiente.");

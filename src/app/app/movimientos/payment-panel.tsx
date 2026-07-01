@@ -6,7 +6,7 @@ import { pendingBalance, totalPaid } from "@/lib/payments";
 
 export function PaymentPanel({ canWrite, movement }: { canWrite: boolean; movement: MovementWithRelations }) {
   const paid = totalPaid(movement.payments);
-  const pending = pendingBalance(movement.amount, movement.payments);
+  const pending = pendingBalance(movement.projectedAmountClp, movement.payments);
   const canRegisterPayment = canWrite && movement.status !== "CANCELLED" && movement.currency === "CLP" && pending.gt(0);
 
   return (

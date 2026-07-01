@@ -350,7 +350,7 @@ export async function registerPaymentAction(formData: FormData) {
       amount: amountText
     });
     const nextPayments = [...movement.payments, { amount }];
-    const nextStatus = statusFromPayments(movement.amount, nextPayments);
+    const nextStatus = statusFromPayments(movement.projectedAmountClp, nextPayments);
     const nextRealDate = nextRealDateAfterPayment({
       currentRealDate: movement.realDate,
       nextStatus,
@@ -385,7 +385,7 @@ export async function registerPaymentAction(formData: FormData) {
         after: JSON.parse(JSON.stringify(payment)),
         metadata: {
           movementId: movement.id,
-          pendingBefore: pendingBalance(movement.amount, movement.payments).toString(),
+          pendingBefore: pendingBalance(movement.projectedAmountClp, movement.payments).toString(),
           movementStatusAfter: updatedMovement.status
         }
       }
@@ -426,7 +426,7 @@ export async function cancelPaymentAction(formData: FormData) {
       }
     });
     const nextPayments = payment.movement.payments.map((item) => (item.id === cancelled.id ? cancelled : item));
-    const nextStatus = statusFromPayments(payment.movement.amount, nextPayments);
+    const nextStatus = statusFromPayments(payment.movement.projectedAmountClp, nextPayments);
     const updatedMovement = await tx.movement.update({
       where: { id: payment.movementId },
       data: {

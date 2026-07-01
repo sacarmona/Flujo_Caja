@@ -223,7 +223,7 @@ async function registerReconciliationPayment(params: {
 
   const amount = validatePaymentAmount({ movement, existingPayments: movement.payments, amount: params.amount.toString() });
   const nextPayments = [...movement.payments, { amount }];
-  const nextStatus = statusFromPayments(movement.amount, nextPayments);
+  const nextStatus = statusFromPayments(movement.projectedAmountClp, nextPayments);
   const nextRealDate = nextRealDateAfterPayment({ currentRealDate: movement.realDate, nextStatus, paidAt: params.paidAt });
 
   const payment = await params.tx.payment.create({
@@ -497,7 +497,7 @@ export async function reverseReconciliationAction(formData: FormData) {
           data: { cancelledAt: new Date(), cancelReason: reason ?? "Reversion de conciliacion bancaria" }
         });
         const nextPayments = payment.movement.payments.map((item) => (item.id === cancelled.id ? cancelled : item));
-        const nextStatus = statusFromPayments(payment.movement.amount, nextPayments);
+        const nextStatus = statusFromPayments(payment.movement.projectedAmountClp, nextPayments);
         await tx.movement.update({
           where: { id: payment.movementId },
           data: { status: nextStatus, realDate: nextStatus === "PAID_OR_COLLECTED" ? payment.movement.realDate : null }
