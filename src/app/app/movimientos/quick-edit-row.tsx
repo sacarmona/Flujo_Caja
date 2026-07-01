@@ -6,7 +6,7 @@ import type { MovementStatus } from "@prisma/client";
 import { cancelAndDeleteMovementAction, quickUpdateMovementAction } from "@/app/app/movimientos/actions";
 import { dateInputValue, optionLabel, statusLabels, typeLabels, type MovementFormValues } from "@/app/app/movimientos/shared";
 import { AmountInput } from "@/components/amount-input";
-import { formatDate } from "@/lib/format";
+import { formatAmountNumber, formatDate } from "@/lib/format";
 import { canCancelAndDeleteMovement } from "@/lib/movements";
 
 const quickEditableStatuses = Object.keys(statusLabels).filter((status) => status !== "CANCELLED") as MovementStatus[];
@@ -82,7 +82,7 @@ export function QuickEditRow({ canWrite, isLate, movement }: { canWrite: boolean
             onBlur={(value) => value !== movement.amount && run({ amount: value })}
           />
         ) : (
-          movement.amount
+          formatAmountNumber(movement.amount)
         )}
         <span className="ml-1 text-xs text-slate-400">{movement.currency}</span>
       </td>

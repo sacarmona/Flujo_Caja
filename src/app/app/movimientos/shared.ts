@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import type { MovementStatus, MovementType } from "@prisma/client";
-import { formatCurrency, todayInAppTimeZone } from "@/lib/format";
+import { formatAmountNumber, formatCurrency, todayInAppTimeZone } from "@/lib/format";
 import { weekOfYear } from "@/lib/iso-week";
 
 export const typeLabels: Record<MovementType, string> = {
@@ -73,7 +73,7 @@ export function todayInputValue(): string {
 }
 
 export function formatAmount(amount: { toString(): string } | number, currency: string) {
-  return currency === "CLP" ? formatCurrency(Number(amount)) : `${amount.toString()} ${currency}`;
+  return currency === "CLP" ? formatCurrency(Number(amount)) : `${formatAmountNumber(amount.toString())} ${currency}`;
 }
 
 /**

@@ -9,6 +9,15 @@ export function formatCurrency(amount: number): string {
 }
 
 /**
+ * Separador de miles "." (convencion chilena) sin simbolo de moneda ni
+ * redondeo forzado a entero: para montos que pueden estar en cualquier
+ * moneda (no solo CLP), donde el codigo de moneda ya se muestra aparte.
+ */
+export function formatAmountNumber(amount: string | number): string {
+  return new Intl.NumberFormat(APP_LOCALE, { maximumFractionDigits: 2 }).format(Number(amount));
+}
+
+/**
  * Las fechas que recibe (projectedDate, paidAt, startDate, etc.) son dias de
  * calendario construidos con new Date(year, month, day) en la zona horaria
  * del proceso, sin hora real asociada. Forzar timeZone: APP_TIME_ZONE aqui

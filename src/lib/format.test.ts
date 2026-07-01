@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatCurrency, formatDate, formatDateTime, todayInAppTimeZone } from "./format";
+import { formatAmountNumber, formatCurrency, formatDate, formatDateTime, todayInAppTimeZone } from "./format";
 
 describe("format helpers", () => {
   it("formats CLP amounts using es-CL", () => {
     expect(formatCurrency(1234567)).toBe("$1.234.567");
+  });
+
+  it("formatAmountNumber usa separador de miles sin simbolo de moneda, para montos en cualquier moneda", () => {
+    expect(formatAmountNumber("139687")).toBe("139.687");
+    expect(formatAmountNumber(1000)).toBe("1.000");
+    expect(formatAmountNumber("500.5")).toBe("500,5");
   });
 
   it("formats real timestamps in the Chile time zone", () => {
