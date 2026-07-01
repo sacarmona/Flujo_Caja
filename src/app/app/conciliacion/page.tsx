@@ -9,14 +9,13 @@ import {
   discardBankMovementAction,
   loadCandidates,
   reverseReconciliationAction,
-  splitReconciliationAction,
   uploadBankStatementAction
 } from "./actions";
 import { optionLabel } from "../movimientos/shared";
-import { AmountInput } from "@/components/amount-input";
 import { ErrorBanner } from "@/components/error-banner";
 import { SavedBanner } from "@/components/saved-banner";
 import { formatCurrency } from "@/lib/format";
+import { SplitReconciliationForm } from "./split-reconciliation-form";
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -275,31 +274,15 @@ export default async function ConciliacionPage() {
                       <summary className="cursor-pointer text-xs font-semibold text-adentu-blue">
                         Distribuir entre varios movimientos (ej. un cliente pago varias facturas juntas)
                       </summary>
-                      <form action={splitReconciliationAction} className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
-                        <input name="reconciliationId" type="hidden" value={reconciliationId} />
-                        <p className="mb-2 text-xs text-slate-600">
-                          Marca los movimientos que corresponden a esta fila y el monto exacto de cada uno. La suma debe ser igual a{" "}
-                          {formatCurrency(Number(row.amount.abs()))}.
-                        </p>
-                        <div className="space-y-1.5">
-                          {splitCandidates.map((candidate) => (
-                            <label className="flex flex-wrap items-center gap-2" key={candidate.movementId}>
-                              <input name="movementIds" type="checkbox" value={candidate.movementId} />
-                              <span className="min-w-0 flex-1 truncate">
-                                {candidate.description} · {formatDate(candidate.projectedDate)} · pendiente {formatCurrency(Number(candidate.pending))}
-                              </span>
-                              <AmountInput
-                                className="w-32 rounded-md border border-slate-300 px-2 py-1 text-right text-sm"
-                                name={`amount_${candidate.movementId}`}
-                                placeholder="$0"
-                              />
-                            </label>
-                          ))}
-                        </div>
-                        <button className="mt-2 rounded-md bg-adentu-blue px-3 py-1.5 text-xs font-semibold text-white" type="submit">
-                          Distribuir y confirmar
-                        </button>
-                      </form>
+                      <SplitReconciliationForm
+                        candidates={splitCandidates.map((candidate) => ({
+                          movementId: candidate.movementId,
+                          label: `${candidate.description} · ${formatDate(candidate.projectedDate)} · pendiente ${formatCurrency(Number(candidate.pending))}`,
+                          pendingRaw: candidate.pending.toString()
+                        }))}
+                        reconciliationId={reconciliationId ?? ""}
+                        targetAmount={Number(row.amount.abs())}
+                      />
                     </details>
                   ) : null}
                 </div>
