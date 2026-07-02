@@ -17,6 +17,15 @@ import { SavedBanner } from "@/components/saved-banner";
 import { formatCurrency } from "@/lib/format";
 import { SplitReconciliationForm } from "./split-reconciliation-form";
 
+/**
+ * La importacion de cartola y la conciliacion dividida hacen varios inserts
+ * secuenciales dentro de una transaccion interactiva de Prisma; con cartolas
+ * o distribuciones de varios movimientos eso puede superar el limite de
+ * duracion por defecto de una funcion serverless de Vercel, que termina el
+ * proceso a mitad de la transaccion antes de que Prisma la cierre.
+ */
+export const maxDuration = 60;
+
 function formatDate(date: Date): string {
   return date.toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" });
 }

@@ -221,14 +221,18 @@ async function registerReconciliationPayment(params: {
   userId: string;
   companyId: string;
   movementId: string;
+  /** Si ya se cargo el movimiento (ej. distribucion entre varios), se reutiliza en vez de volver a consultarlo: cada round-trip cuenta cuando hay varios movimientos dentro de la misma transaccion interactiva. */
+  movement?: Prisma.MovementGetPayload<{ include: { payments: true } }>;
   amount: Prisma.Decimal;
   paidAt: Date;
   reference: string;
 }) {
-  const movement = await params.tx.movement.findFirst({
-    where: { id: params.movementId, companyId: params.companyId, deletedAt: null },
-    include: { payments: true }
-  });
+  const movement =
+    params.movement ??
+    (await params.tx.movement.findFirst({
+      where: { id: params.movementId, companyId: params.companyId, deletedAt: null },
+      include: { payments: true }
+    }));
   if (!movement) {
     throw new Error("El movimiento no existe.");
   }
@@ -342,7 +346,8 @@ export async function splitReconciliationAction(formData: FormData) {
 
       const expectedType = movementTypeForBankType(reconciliation.bankMovement.type);
       const movements = await tx.movement.findMany({
-        where: { id: { in: allocations.map((allocation) => allocation.movementId) }, companyId: user.companyId, deletedAt: null }
+        where: { id: { in: allocations.map((allocation) => allocation.movementId) }, companyId: user.companyId, deletedAt: null },
+        include: { payments: true }
       });
       if (movements.length !== allocations.length) {
         throw new Error("Alguno de los movimientos seleccionados no existe.");
@@ -350,6 +355,7 @@ export async function splitReconciliationAction(formData: FormData) {
       if (movements.some((movement) => movement.type !== expectedType)) {
         throw new Error("Todos los movimientos seleccionados deben ser del mismo tipo que la fila bancaria.");
       }
+      const movementsById = new Map(movements.map((movement) => [movement.id, movement]));
 
       // Se reemplaza la fila placeholder (sin confirmar, matchLevel NONE/POSSIBLE) por las N filas del reparto.
       await tx.reconciliation.delete({ where: { id: reconciliation.id } });
@@ -361,6 +367,7 @@ export async function splitReconciliationAction(formData: FormData) {
           userId: user.id,
           companyId: user.companyId,
           movementId: allocation.movementId,
+          movement: movementsById.get(allocation.movementId),
           amount: allocation.amount,
           paidAt: reconciliation.bankMovement.date,
           reference: referenceNote
