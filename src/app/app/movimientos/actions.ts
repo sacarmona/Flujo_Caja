@@ -217,7 +217,7 @@ export async function quickUpdateMovementAction(input: {
   const data: Prisma.MovementUpdateInput = {};
 
   if (input.projectedDate !== undefined) {
-    const projectedDate = new Date(`${input.projectedDate}T00:00:00.000`);
+    const projectedDate = new Date(`${input.projectedDate}T00:00:00.000Z`);
     if (Number.isNaN(projectedDate.getTime())) {
       throw new Error("La fecha ingresada no es valida.");
     }
@@ -327,7 +327,7 @@ export async function registerPaymentAction(formData: FormData) {
   const user = await requireMovementWriter();
   const movementId = stringValue(formData, "movementId");
   const amountText = stringValue(formData, "amount");
-  const paidAt = new Date(`${stringValue(formData, "paidAt")}T00:00:00.000`);
+  const paidAt = new Date(`${stringValue(formData, "paidAt")}T00:00:00.000Z`);
   const reference = optionalStringValue(formData, "reference");
 
   if (Number.isNaN(paidAt.getTime())) {

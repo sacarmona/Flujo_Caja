@@ -34,7 +34,7 @@ export function parseOpeningBalanceAmount(value: string): Prisma.Decimal {
 }
 
 export function parseOpeningBalanceDate(value: string): Date {
-  const date = new Date(`${value}T00:00:00.000`);
+  const date = new Date(`${value}T00:00:00.000Z`);
 
   if (!value || Number.isNaN(date.getTime())) {
     throw new Error("La fecha del saldo inicial es obligatoria.");

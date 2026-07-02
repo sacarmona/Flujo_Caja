@@ -96,8 +96,8 @@ describe("movement rules", () => {
     const paidMovement = {
       status: "PAID_OR_COLLECTED" as const,
       amount: new Prisma.Decimal("100000"),
-      projectedDate: new Date("2026-06-18T00:00:00.000"),
-      realDate: new Date("2026-06-20T00:00:00.000")
+      projectedDate: new Date("2026-06-18T00:00:00.000Z"),
+      realDate: new Date("2026-06-20T00:00:00.000Z")
     };
     const unchanged = { ...baseInput, realDate: "2026-06-20" };
 

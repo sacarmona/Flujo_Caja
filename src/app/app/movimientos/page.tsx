@@ -113,8 +113,8 @@ function movementsWhere(companyId: string, filters: SearchParams) {
     ...(filters.from || filters.to || late || weekFloor
       ? {
           projectedDate: {
-            ...(filters.from ? { gte: new Date(`${filters.from}T00:00:00.000`) } : {}),
-            ...(filters.to ? { lte: new Date(`${filters.to}T23:59:59.999`) } : {}),
+            ...(filters.from ? { gte: new Date(`${filters.from}T00:00:00.000Z`) } : {}),
+            ...(filters.to ? { lte: new Date(`${filters.to}T23:59:59.999Z`) } : {}),
             ...(late ? { lt: todayInAppTimeZone() } : {}),
             ...(weekFloor ? { gte: weekFloor } : {})
           }

@@ -21,7 +21,7 @@ type BitacoraPageProps = {
 
 function parseDateInput(value: string | undefined): Date | null {
   if (!value) return null;
-  const parsed = new Date(`${value}T00:00:00.000`);
+  const parsed = new Date(`${value}T00:00:00.000Z`);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 

@@ -8,14 +8,20 @@ export type PendingMovementSummary = {
   projectedAmountClp: Prisma.Decimal | number | string;
 };
 
+/**
+ * Lee los componentes en UTC (no locales): las fechas de calendario en esta
+ * app se construyen explicitamente en UTC medianoche (ver parseOptionalDate
+ * en movements.ts), asi que leerlas con getFullYear()/getMonth()/getDate()
+ * (locales) desfasaria el dia en cualquier proceso que no corra en UTC.
+ */
 function dateOnly(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
 export function parseDashboardDate(value: string | undefined, fallback: Date): Date {
   if (!value) return dateOnly(fallback);
 
-  const parsed = new Date(`${value}T00:00:00.000`);
+  const parsed = new Date(`${value}T00:00:00.000Z`);
   return Number.isNaN(parsed.getTime()) ? dateOnly(fallback) : dateOnly(parsed);
 }
 

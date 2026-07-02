@@ -127,7 +127,7 @@ export function parseOptionalDate(value: string | null): Date | null {
     return null;
   }
 
-  const date = new Date(`${value}T00:00:00.000`);
+  const date = new Date(`${value}T00:00:00.000Z`);
 
   if (Number.isNaN(date.getTime())) {
     throw new Error("Fecha invalida.");
