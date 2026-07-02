@@ -302,7 +302,7 @@ export async function confirmReconciliationAction(formData: FormData) {
         where: { id: reconciliation.id },
         data: { movementId, paymentId: payment.id, confirmed: true, confirmedById: user.id, confirmedAt: new Date() }
       });
-    });
+    }, { timeout: 60000, maxWait: 10000 });
   } catch (error) {
     return redirectWithError("/app/conciliacion", error instanceof Error ? error.message : "No se pudo confirmar la conciliacion.");
   }
@@ -385,7 +385,7 @@ export async function splitReconciliationAction(formData: FormData) {
           }
         });
       }
-    });
+    }, { timeout: 60000, maxWait: 10000 });
   } catch (error) {
     return redirectWithError("/app/conciliacion", error instanceof Error ? error.message : "No se pudo distribuir la fila bancaria.");
   }
@@ -484,7 +484,7 @@ export async function createMovementFromBankRowAction(formData: FormData) {
         where: { id: reconciliation.id },
         data: { movementId: movement.id, paymentId: payment.id, confirmed: true, confirmedById: user.id, confirmedAt: new Date() }
       });
-    });
+    }, { timeout: 60000, maxWait: 10000 });
   } catch (error) {
     return redirectWithError("/app/conciliacion", error instanceof Error ? error.message : "No se pudo crear el movimiento.");
   }
@@ -527,7 +527,7 @@ export async function reverseReconciliationAction(formData: FormData) {
         where: { id: reconciliation.id },
         data: { reversed: true, reversedAt: new Date(), reversalReason: reason }
       });
-    });
+    }, { timeout: 60000, maxWait: 10000 });
   } catch (error) {
     return redirectWithError("/app/conciliacion", error instanceof Error ? error.message : "No se pudo revertir la conciliacion.");
   }
@@ -583,7 +583,7 @@ export async function discardBankMovementAction(formData: FormData) {
       if (remaining === 0) {
         await deleteEmptyBatch(tx, batchId);
       }
-    });
+    }, { timeout: 60000, maxWait: 10000 });
   } catch (error) {
     return redirectWithError("/app/conciliacion", error instanceof Error ? error.message : "No se pudo descartar la fila.");
   }
@@ -615,7 +615,7 @@ export async function cancelImportBatchAction(formData: FormData) {
       if (remaining === 0) {
         await deleteEmptyBatch(tx, batchId);
       }
-    });
+    }, { timeout: 60000, maxWait: 10000 });
   } catch (error) {
     return redirectWithError("/app/conciliacion", error instanceof Error ? error.message : "No se pudo cancelar la importacion.");
   }
