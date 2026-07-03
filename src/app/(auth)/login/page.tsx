@@ -5,10 +5,10 @@ import { LoginForm } from "./login-form";
 export default function LoginPage() {
   return (
     <main
-      className="flex min-h-screen items-center justify-center bg-adentu-mist bg-cover bg-center px-4 py-10"
+      className="flex min-h-screen items-center justify-center bg-adentu-mist bg-cover bg-center px-4 py-10 md:justify-start md:pl-16 lg:pl-24"
       style={{ backgroundImage: "url('/login-bg.png')" }}
     >
-      <section className="w-full max-w-md rounded-lg border border-slate-200 bg-white/95 p-8 shadow-lg backdrop-blur-sm">
+      <section className="w-full max-w-md rounded-lg border border-slate-200 bg-adentu-mist/70 p-8 shadow-lg backdrop-blur-md">
         <div className="mb-8 flex items-center gap-3">
           <div className="flex size-11 items-center justify-center rounded bg-adentu-blue text-white">
             <Lock aria-hidden className="size-5" />
