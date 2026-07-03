@@ -1,4 +1,4 @@
-import { Lock } from "lucide-react";
+import Image from "next/image";
 import { APP_COMPANY_NAME } from "@/lib/constants";
 import { LoginForm } from "./login-form";
 
@@ -10,9 +10,7 @@ export default function LoginPage() {
     >
       <section className="w-full max-w-md rounded-lg border border-slate-200 bg-adentu-mist/70 p-8 shadow-lg backdrop-blur-md">
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded bg-adentu-blue text-white">
-            <Lock aria-hidden className="size-5" />
-          </div>
+          <Image alt="ADENTU" className="shrink-0" height={44} priority src="/brand-icon.png" width={44} />
           <div>
             <h1 className="text-xl font-semibold text-adentu-ink">Iniciar sesion</h1>
             <p className="text-sm text-slate-600">{APP_COMPANY_NAME}</p>
