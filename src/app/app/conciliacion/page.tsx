@@ -294,6 +294,38 @@ export default async function ConciliacionPage() {
                       />
                     </details>
                   ) : null}
+
+                  {canManage && live.matchLevel !== "HIGH"
+                    ? (() => {
+                        const partialCandidates = splitCandidates.filter((candidate) => candidate.pending.gte(row.amount.abs()));
+                        return partialCandidates.length > 0 ? (
+                          <details className="mt-3">
+                            <summary className="cursor-pointer text-xs font-semibold text-adentu-blue">
+                              Asignar como pago parcial de un movimiento (ej. una factura que se paga en varias transferencias)
+                            </summary>
+                            <form action={confirmReconciliationAction} className="mt-2 flex flex-wrap items-end gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+                              <input name="reconciliationId" type="hidden" value={reconciliationId} />
+                              <label className="text-xs">
+                                <span className="mb-1 block text-slate-600">Movimiento</span>
+                                <select className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" name="movementId" required>
+                                  <option disabled value="">
+                                    Selecciona un movimiento
+                                  </option>
+                                  {partialCandidates.map((candidate) => (
+                                    <option key={candidate.movementId} value={candidate.movementId}>
+                                      {candidate.description} · {formatDate(candidate.projectedDate)} · pendiente {formatCurrency(Number(candidate.pending))}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <button className="rounded-md bg-adentu-blue px-3 py-1.5 text-xs font-semibold text-white" type="submit">
+                                Registrar pago parcial
+                              </button>
+                            </form>
+                          </details>
+                        ) : null;
+                      })()
+                    : null}
                 </div>
               );
             })}
