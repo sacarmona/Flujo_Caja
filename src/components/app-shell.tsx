@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Building2, CalendarDays, ChevronLeft, ChevronRight, History, ListChecks, Repeat2, Settings, WalletCards } from "lucide-react";
 import { APP_COMPANY_NAME, ROLE_LABELS, type AppRole } from "@/lib/constants";
@@ -27,6 +28,7 @@ type AppShellProps = {
 };
 
 export function AppShell({ children, user }: AppShellProps) {
+  const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -40,9 +42,9 @@ export function AppShell({ children, user }: AppShellProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-adentu-ink">
+    <div className="min-h-screen bg-adentu-mist text-adentu-ink">
       <aside
-        className={`fixed inset-y-0 left-0 hidden flex-col border-r border-slate-200 bg-white py-6 transition-[width] lg:flex ${
+        className={`fixed inset-y-0 left-0 hidden flex-col bg-adentu-navy py-6 transition-[width] lg:flex ${
           collapsed ? "w-20 px-3" : "w-72 px-5"
         }`}
       >
@@ -50,31 +52,34 @@ export function AppShell({ children, user }: AppShellProps) {
           <Image alt="ADENTU" className="shrink-0" height={40} priority src="/brand-icon.png" width={40} />
           {collapsed ? null : (
             <span>
-              <span className="block text-base font-semibold">ADENTU Cash Flow</span>
-              <span className="block text-xs text-slate-500">{APP_COMPANY_NAME}</span>
+              <span className="block text-base font-semibold text-white">ADENTU Cash Flow</span>
+              <span className="block text-xs text-slate-300">{APP_COMPANY_NAME}</span>
             </span>
           )}
         </Link>
 
         <nav className="mt-9 flex-1 space-y-1">
-          {navigation.map((item) => (
-            <Link
-              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-adentu-mist hover:text-adentu-blue ${
-                collapsed ? "justify-center" : ""
-              }`}
-              href={item.href}
-              key={item.href}
-              title={collapsed ? item.label : undefined}
-            >
-              <item.icon aria-hidden className="size-4 shrink-0" />
-              {collapsed ? null : item.label}
-            </Link>
-          ))}
+          {navigation.map((item) => {
+            const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+            return (
+              <Link
+                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition ${
+                  active ? "bg-adentu-navy-light text-white" : "text-slate-300 hover:bg-adentu-navy-light hover:text-white"
+                } ${collapsed ? "justify-center" : ""}`}
+                href={item.href}
+                key={item.href}
+                title={collapsed ? item.label : undefined}
+              >
+                <item.icon aria-hidden className="size-4 shrink-0" />
+                {collapsed ? null : item.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <button
           aria-label={collapsed ? "Expandir menu" : "Ocultar menu"}
-          className="flex items-center justify-center gap-2 self-stretch rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:border-adentu-blue hover:text-adentu-blue"
+          className="flex items-center justify-center gap-2 self-stretch rounded-md border border-adentu-navy-light px-3 py-2 text-xs font-medium text-slate-300 transition hover:border-white hover:text-white"
           onClick={toggleCollapsed}
           type="button"
         >

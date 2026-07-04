@@ -10,7 +10,9 @@ const config: Config = {
           blue: "#0f5f8f",
           teal: "#0f766e",
           gold: "#b7791f",
-          mist: "#eef5f7"
+          mist: "#eef5f7",
+          navy: "#0b2c4d",
+          "navy-light": "#173f66"
         }
       }
     }
