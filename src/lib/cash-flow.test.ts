@@ -458,6 +458,54 @@ describe("cash flow business-day service", () => {
     expect(result.days[0].realExpense.toString()).toBe("0");
   });
 
+  it("acepta varios estados en el filtro status (select multiple de Movimientos)", () => {
+    const movements = [
+      {
+        ...baseMovement,
+        id: "pending",
+        type: "INCOME" as const,
+        status: "PENDING" as const,
+        projectedDate: date("2026-06-15"),
+        projectedAmountClp: "50000",
+        accountingAccountId: incomeAccount.id,
+        businessUnitId: unitOps.id,
+        accountingAccount: incomeAccount,
+        businessUnit: unitOps
+      },
+      {
+        ...baseMovement,
+        id: "partial",
+        type: "INCOME" as const,
+        status: "PARTIALLY_PAID" as const,
+        projectedDate: date("2026-06-15"),
+        projectedAmountClp: "30000",
+        accountingAccountId: incomeAccount.id,
+        businessUnitId: unitOps.id,
+        accountingAccount: incomeAccount,
+        businessUnit: unitOps
+      },
+      {
+        ...baseMovement,
+        id: "projected",
+        type: "INCOME" as const,
+        status: "PROJECTED" as const,
+        projectedDate: date("2026-06-15"),
+        projectedAmountClp: "90000",
+        accountingAccountId: incomeAccount.id,
+        businessUnitId: unitOps.id,
+        accountingAccount: incomeAccount,
+        businessUnit: unitOps
+      }
+    ];
+    const result = calculateCashFlowByBusinessDay(movements, openingBalances, {
+      startDate: date("2026-06-15"),
+      endDate: date("2026-06-15"),
+      filters: { status: ["PENDING", "PARTIALLY_PAID"] }
+    });
+
+    expect(result.days[0].pendingIncome.toString()).toBe("80000");
+  });
+
   it("calculates weekly totals with Monday week start", () => {
     const result = calculateCashFlowByBusinessDay(
       [

@@ -48,7 +48,7 @@ export type CashFlowOpeningBalance = {
 export type CashFlowFilters = {
   businessUnitId?: string;
   accountingAccountId?: string;
-  status?: MovementStatus;
+  status?: MovementStatus | MovementStatus[];
   type?: MovementType;
   currency?: Currency;
 };
@@ -171,11 +171,16 @@ export function businessDaysBetween(startDate: Date, endDate: Date, holidays: st
   return days;
 }
 
+function matchesStatus(movementStatus: MovementStatus, filter: CashFlowFilters["status"]): boolean {
+  if (!filter) return true;
+  return Array.isArray(filter) ? filter.length === 0 || filter.includes(movementStatus) : movementStatus === filter;
+}
+
 function matchesFilters(movement: CashFlowMovement, filters: CashFlowFilters = {}) {
   return (
     (!filters.businessUnitId || movement.businessUnitId === filters.businessUnitId) &&
     (!filters.accountingAccountId || movement.accountingAccountId === filters.accountingAccountId) &&
-    (!filters.status || movement.status === filters.status) &&
+    matchesStatus(movement.status, filters.status) &&
     (!filters.type || movement.type === filters.type) &&
     (!filters.currency || movement.currency === filters.currency)
   );

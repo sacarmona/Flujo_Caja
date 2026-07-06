@@ -21,7 +21,7 @@ type SearchParams = {
   page?: string;
   from?: string;
   to?: string;
-  status?: MovementStatus;
+  status?: string | string[];
   type?: MovementType;
   accountingAccountId?: string;
   businessUnitId?: string;
@@ -29,6 +29,12 @@ type SearchParams = {
   late?: string;
   range?: string;
 };
+
+/** El filtro de Estado admite seleccionar varios (select multiple); normaliza el valor crudo del querystring (string, string[] o ausente) a la lista de estados validos. */
+function statusValues(filters: SearchParams): MovementStatus[] {
+  const raw = filters.status ? (Array.isArray(filters.status) ? filters.status : [filters.status]) : [];
+  return raw.filter((value): value is MovementStatus => (movementStatuses as readonly string[]).includes(value));
+}
 
 type MovimientosPageProps = {
   searchParams: Promise<SearchParams>;
@@ -102,11 +108,12 @@ function currentWeekFloor(filters: SearchParams, late: boolean): Date | null {
 function movementsWhere(companyId: string, filters: SearchParams) {
   const late = filters.late === "true";
   const weekFloor = currentWeekFloor(filters, late);
+  const statuses = statusValues(filters);
   return {
     companyId,
     deletedAt: null,
     ...(filters.type ? { type: filters.type } : {}),
-    ...(late ? { status: { in: ["PROJECTED", "PENDING"] as MovementStatus[] } } : filters.status ? { status: filters.status } : {}),
+    ...(late ? { status: { in: ["PROJECTED", "PENDING"] as MovementStatus[] } } : statuses.length > 0 ? { status: { in: statuses } } : {}),
     ...(filters.accountingAccountId ? { accountingAccountId: filters.accountingAccountId } : {}),
     ...(filters.businessUnitId ? { businessUnitId: filters.businessUnitId } : {}),
     ...(filters.recurrenceRuleId ? { recurrenceRuleId: filters.recurrenceRuleId } : {}),
@@ -175,7 +182,7 @@ async function getWeeklyBalances(companyId: string, filters: SearchParams) {
       filters: {
         businessUnitId: filters.businessUnitId,
         accountingAccountId: filters.accountingAccountId,
-        status: filters.status,
+        status: statusValues(filters),
         type: filters.type
       }
     });
@@ -189,7 +196,9 @@ async function getWeeklyBalances(companyId: string, filters: SearchParams) {
 function pageHref(page: number, filters: SearchParams) {
   const params = new URLSearchParams();
   Object.entries({ ...filters, page: String(page) }).forEach(([key, value]) => {
-    if (value) {
+    if (Array.isArray(value)) {
+      value.forEach((item) => item && params.append(key, item));
+    } else if (value) {
       params.set(key, value);
     }
   });
@@ -254,9 +263,14 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
           </select>
         </label>
         <label className="text-sm">
-          <span className="mb-1 block text-slate-600">Estado</span>
-          <select className="w-full rounded-md border border-slate-300 px-2 py-2" name="status" defaultValue={filters.status ?? ""}>
-            <option value="">Todos</option>
+          <span className="mb-1 block text-slate-600">Estado (ctrl/cmd + clic para elegir varios)</span>
+          <select
+            className="w-full rounded-md border border-slate-300 px-2 py-2"
+            defaultValue={statusValues(filters)}
+            multiple
+            name="status"
+            size={4}
+          >
             <SelectOptions labels={statusLabels} values={movementStatuses} />
           </select>
         </label>

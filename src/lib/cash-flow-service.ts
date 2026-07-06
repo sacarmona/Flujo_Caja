@@ -38,7 +38,13 @@ export async function calculateSantanderCashFlow(params: {
         deletedAt: null,
         ...(params.filters?.businessUnitId ? { businessUnitId: params.filters.businessUnitId } : {}),
         ...(params.filters?.accountingAccountId ? { accountingAccountId: params.filters.accountingAccountId } : {}),
-        ...(params.filters?.status ? { status: params.filters.status } : {}),
+        ...(Array.isArray(params.filters?.status)
+          ? params.filters.status.length > 0
+            ? { status: { in: params.filters.status } }
+            : {}
+          : params.filters?.status
+            ? { status: params.filters.status }
+            : {}),
         ...(params.filters?.type ? { type: params.filters.type } : {}),
         ...(params.filters?.currency ? { currency: params.filters.currency } : {})
       },
