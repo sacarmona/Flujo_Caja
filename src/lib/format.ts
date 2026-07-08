@@ -19,15 +19,18 @@ export function formatAmountNumber(amount: string | number): string {
 
 /**
  * Las fechas que recibe (projectedDate, paidAt, startDate, etc.) son dias de
- * calendario construidos con new Date(year, month, day) en la zona horaria
- * del proceso, sin hora real asociada. Forzar timeZone: APP_TIME_ZONE aqui
- * reinterpretaria ese instante en Chile, lo que en un servidor que corre en
- * UTC (Vercel) podia retroceder un dia (ej. mostrar 25/6 en vez de 26/6). Sin
- * timeZone, Intl usa la zona del proceso, la misma con la que se construyo
- * la fecha, igual que dateLabel() en el Calendario.
+ * calendario construidos siempre en UTC medianoche explicito (ver
+ * parseOptionalDate en movements.ts). Forzar timeZone: "UTC" aqui es lo que
+ * las lee de forma consistente sin importar donde se ejecute el codigo: en
+ * el servidor (Vercel, UTC) o en el navegador de un usuario en Chile
+ * (UTC-3/-4) via un Client Component (ej. QuickEditRow). Sin forzar la zona,
+ * Intl usaba la zona del proceso que renderiza, que en el navegador retrocedia
+ * un dia (ej. mostraba 07-07 en vez de 08-07), desordenando el listado de
+ * Movimientos cuando se mezclaban filas server-rendered y client-rendered.
  */
 export function formatDate(date: Date): string {
   return new Intl.DateTimeFormat(APP_LOCALE, {
+    timeZone: "UTC",
     dateStyle: "medium"
   }).format(date);
 }

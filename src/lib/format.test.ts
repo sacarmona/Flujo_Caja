@@ -21,11 +21,14 @@ describe("format helpers", () => {
     expect(formatDate(new Date("2026-06-18T12:00:00.000Z"))).toContain("2026");
   });
 
-  it("muestra el mismo dia de calendario con que se construyo la fecha, sin reinterpretarla por zona horaria", () => {
-    // projectedDate/paidAt/etc se construyen con new Date(year, month, day) en
-    // la zona del proceso; formatDate no debe forzar otra zona (ver comentario
-    // en format.ts) o en un servidor en UTC se puede mostrar el dia anterior.
-    expect(formatDate(new Date(2026, 5, 26))).toContain("26");
+  it("muestra el mismo dia de calendario en UTC, sin importar la zona horaria de quien renderiza", () => {
+    // projectedDate/paidAt/etc se construyen siempre en UTC medianoche
+    // explicito; formatDate fuerza timeZone: "UTC" (ver comentario en
+    // format.ts) para leerlas igual en el servidor (Vercel, UTC) que en el
+    // navegador de un usuario en Chile via un Client Component (ej.
+    // QuickEditRow) -- si no forzara la zona, en Chile (UTC-3/-4) una fecha
+    // UTC medianoche se leia como el dia anterior.
+    expect(formatDate(new Date("2026-06-26T00:00:00.000Z"))).toContain("26");
   });
 
   describe("todayInAppTimeZone", () => {
