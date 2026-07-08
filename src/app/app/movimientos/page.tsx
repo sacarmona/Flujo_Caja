@@ -52,6 +52,39 @@ function optionLabel(code: string | null | undefined, name: string) {
   return code ? `${code} - ${name}` : name;
 }
 
+/**
+ * Dropdown de checkboxes con <details> (sin JS): mantiene la fila de
+ * filtros a la misma altura que el resto de los select (antes el <select
+ * multiple> con su propia lista abierta rompia el alto de la fila), y no
+ * necesita texto de instruccion visible (title da el hint on hover).
+ */
+function StatusFilterDropdown({ selected }: { selected: MovementStatus[] }) {
+  const summaryText =
+    selected.length === 0 ? "Todos" : selected.length === 1 ? statusLabels[selected[0]] : `${selected.length} seleccionados`;
+
+  return (
+    <details className="relative">
+      <summary
+        className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-md border border-slate-300 px-2 py-2 marker:content-none [&::-webkit-details-marker]:hidden"
+        title="Selecciona uno o varios estados"
+      >
+        <span className="truncate">{summaryText}</span>
+        <span aria-hidden className="text-slate-400">
+          ▾
+        </span>
+      </summary>
+      <div className="absolute z-20 mt-1 w-48 space-y-0.5 rounded-md border border-slate-200 bg-white p-2 shadow-lg">
+        {movementStatuses.map((status) => (
+          <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-adentu-mist" key={status}>
+            <input defaultChecked={selected.includes(status)} name="status" type="checkbox" value={status} />
+            {statusLabels[status]}
+          </label>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 async function getReferenceData(companyId: string) {
   const [accounts, businessUnits, bankAccounts, projects, costCenters, vendors] = await Promise.all([
     prisma.accountingAccount.findMany({
@@ -262,18 +295,10 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
             <SelectOptions labels={typeLabels} values={movementTypes} />
           </select>
         </label>
-        <label className="text-sm">
-          <span className="mb-1 block text-slate-600">Estado (ctrl/cmd + clic para elegir varios)</span>
-          <select
-            className="w-full rounded-md border border-slate-300 px-2 py-2"
-            defaultValue={statusValues(filters)}
-            multiple
-            name="status"
-            size={4}
-          >
-            <SelectOptions labels={statusLabels} values={movementStatuses} />
-          </select>
-        </label>
+        <div className="text-sm">
+          <span className="mb-1 block text-slate-600">Estado</span>
+          <StatusFilterDropdown selected={statusValues(filters)} />
+        </div>
         <label className="text-sm">
           <span className="mb-1 block text-slate-600">Cuenta</span>
           <select
