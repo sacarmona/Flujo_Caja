@@ -163,6 +163,22 @@ function movementsWhere(companyId: string, filters: SearchParams) {
   };
 }
 
+/**
+ * Prisma no permite ordenar un enum por una lista de prioridad custom (solo
+ * asc/desc alfabetico), asi que la fecha se ordena en la consulta y este
+ * orden de estado se aplica como desempate en JS despues de traer la
+ * pagina: no cambia que 30 movimientos caen en cada pagina (eso ya lo fijo
+ * el orderBy de la consulta), solo el orden entre los que comparten fecha.
+ */
+const statusPriority: Record<MovementStatus, number> = {
+  PAID_OR_COLLECTED: 0,
+  PARTIALLY_PAID: 1,
+  PENDING: 2,
+  OVERDUE: 3,
+  PROJECTED: 4,
+  CANCELLED: 5
+};
+
 async function getMovements(companyId: string, filters: SearchParams) {
   const page = Math.max(Number(filters.page ?? 1) || 1, 1);
   const where = movementsWhere(companyId, filters);
@@ -177,6 +193,8 @@ async function getMovements(companyId: string, filters: SearchParams) {
     }),
     prisma.movement.count({ where })
   ]);
+
+  items.sort((a, b) => a.projectedDate.getTime() - b.projectedDate.getTime() || statusPriority[a.status] - statusPriority[b.status]);
 
   return { items, total, page, pages: Math.max(Math.ceil(total / pageSize), 1) };
 }
