@@ -319,19 +319,30 @@ export function calculateCashFlowByBusinessDay(
     const active = movement.payments.filter((payment) => !payment.deletedAt && !payment.cancelledAt);
 
     /**
-     * Pagado/Cobrado: el monto del pronostico completo (fullProjected) se
-     * ubica en la fecha de pago/conciliacion, igual que Real, para que
-     * Proyectado coincida exactamente con Real en los movimientos ya
-     * resueltos. El resto de los estados (Proyectado, Pendiente, Parcial,
-     * Vencido) sigue usando la fecha y monto proyectados originales, ya que
-     * todavia no hay un pago real que represente mejor cuando se movera el
-     * dinero.
+     * Pronostico completo (fullProjected): la parte ya pagada/cobrada se
+     * ubica en la fecha de cada pago (igual que Real), para que Proyectado
+     * converja a Real a medida que los movimientos se resuelven -- tanto en
+     * Pagado/Cobrado (donde cubre el total) como en Parcial (donde cubre
+     * los abonos). En Parcial, ademas, solo el SALDO PENDIENTE queda en la
+     * fecha proyectada: proyectar el monto total alli duplicaba en el
+     * futuro plata que ya se pago/neteo (ej. un pago parcial neteado contra
+     * el cobro parcial de un ingreso), mostrando una caja proyectada menor
+     * que la real entre las fechas proyectadas del egreso y del ingreso.
+     * Los estados sin pagos (Proyectado, Pendiente, Vencido) siguen usando
+     * la fecha y monto proyectados originales.
      */
-    if (movement.status === "PAID_OR_COLLECTED" && active.length > 0) {
+    if (active.length > 0) {
       for (const payment of active) {
         const day = dayByKey.get(dateKey(moveToNextBusinessDay(payment.paidAt, holidaySet)));
         if (day) {
           addFullProjectedEntry(day, movement, decimal(payment.amount));
+        }
+      }
+      if (movement.status !== "PAID_OR_COLLECTED" && projectedDay) {
+        const paid = active.reduce((sum, payment) => sum.plus(decimal(payment.amount)), new Prisma.Decimal(0));
+        const pendingBalance = decimal(movement.projectedAmountClp).minus(paid);
+        if (pendingBalance.gt(0)) {
+          addFullProjectedEntry(projectedDay, movement, pendingBalance);
         }
       }
     } else if (projectedDay) {

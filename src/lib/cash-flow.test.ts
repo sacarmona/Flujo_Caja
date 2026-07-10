@@ -233,6 +233,84 @@ describe("cash flow business-day service", () => {
     expect(paidDay?.realExpense.toString()).toBe("200000");
   });
 
+  it("Parcial ubica en fullProjected cada abono en su fecha de pago y solo el saldo pendiente en la fecha proyectada", () => {
+    const result = calculateCashFlowByBusinessDay(
+      [
+        {
+          ...baseMovement,
+          id: "partial-expense",
+          type: "EXPENSE" as const,
+          status: "PARTIALLY_PAID" as const,
+          projectedDate: date("2026-06-22"),
+          projectedAmountClp: "100000",
+          accountingAccountId: expenseAccount.id,
+          businessUnitId: unitAdmin.id,
+          accountingAccount: expenseAccount,
+          businessUnit: unitAdmin,
+          payments: [{ id: "pay-partial", amount: "40000", paidAt: date("2026-06-17"), currency: "CLP" as const }]
+        }
+      ],
+      openingBalances,
+      { startDate: date("2026-06-17"), endDate: date("2026-06-22") }
+    );
+
+    const paidDay = result.days.find((day) => day.date.getDate() === 17);
+    const projectedDay = result.days.find((day) => day.date.getDate() === 22);
+
+    // El abono parcial (40.000) sale de caja el dia del pago; en la fecha
+    // proyectada solo queda el saldo pendiente (60.000), no el monto total:
+    // proyectar los 100.000 alli duplicaba en el futuro plata ya pagada.
+    expect(paidDay?.fullProjectedExpense.toString()).toBe("40000");
+    expect(projectedDay?.fullProjectedExpense.toString()).toBe("60000");
+  });
+
+  it("Parcial neteado contra un cobro parcial se anula en la fecha del pago y deja solo los saldos pendientes a futuro", () => {
+    const result = calculateCashFlowByBusinessDay(
+      [
+        {
+          ...baseMovement,
+          id: "partial-expense-neteo",
+          type: "EXPENSE" as const,
+          status: "PARTIALLY_PAID" as const,
+          projectedDate: date("2026-06-18"),
+          projectedAmountClp: "100000",
+          accountingAccountId: expenseAccount.id,
+          businessUnitId: unitAdmin.id,
+          accountingAccount: expenseAccount,
+          businessUnit: unitAdmin,
+          payments: [{ id: "pay-neteo-egreso", amount: "30000", paidAt: date("2026-06-17"), currency: "CLP" as const }]
+        },
+        {
+          ...baseMovement,
+          id: "partial-income-neteo",
+          type: "INCOME" as const,
+          status: "PARTIALLY_PAID" as const,
+          projectedDate: date("2026-06-22"),
+          projectedAmountClp: "80000",
+          accountingAccountId: incomeAccount.id,
+          businessUnitId: unitOps.id,
+          accountingAccount: incomeAccount,
+          businessUnit: unitOps,
+          payments: [{ id: "pay-neteo-ingreso", amount: "30000", paidAt: date("2026-06-17"), currency: "CLP" as const }]
+        }
+      ],
+      openingBalances,
+      { startDate: date("2026-06-17"), endDate: date("2026-06-22") }
+    );
+
+    const neteoDay = result.days.find((day) => day.date.getDate() === 17);
+    const expenseDay = result.days.find((day) => day.date.getDate() === 18);
+    const incomeDay = result.days.find((day) => day.date.getDate() === 22);
+
+    // El neteo (30.000 por lado) se anula el mismo dia; entre la fecha del
+    // egreso y la del ingreso el saldo proyectado solo baja por el saldo
+    // pendiente real del egreso (70.000), no por el total (100.000).
+    expect(neteoDay?.fullProjectedExpense.toString()).toBe("30000");
+    expect(neteoDay?.fullProjectedIncome.toString()).toBe("30000");
+    expect(expenseDay?.fullProjectedExpense.toString()).toBe("70000");
+    expect(incomeDay?.fullProjectedIncome.toString()).toBe("50000");
+  });
+
   it("Pendiente cuenta para Modo Pendiente pero no para Modo Real (solo Parcial/Pagado)", () => {
     const result = calculateCashFlowByBusinessDay(
       [
