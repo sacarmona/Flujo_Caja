@@ -17,7 +17,8 @@ import { getCurrentUser } from "@/lib/auth";
 import {
   nextRealDateAfterPayment,
   pendingBalance,
-  statusFromPayments,
+  payableAmountClp,
+  statusFromMovementPayments,
   validatePaymentAmount
 } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
@@ -350,7 +351,7 @@ export async function registerPaymentAction(formData: FormData) {
       amount: amountText
     });
     const nextPayments = [...movement.payments, { amount }];
-    const nextStatus = statusFromPayments(movement.projectedAmountClp, nextPayments);
+    const nextStatus = statusFromMovementPayments(movement, nextPayments);
     const nextRealDate = nextRealDateAfterPayment({
       currentRealDate: movement.realDate,
       nextStatus,
@@ -385,7 +386,7 @@ export async function registerPaymentAction(formData: FormData) {
         after: JSON.parse(JSON.stringify(payment)),
         metadata: {
           movementId: movement.id,
-          pendingBefore: pendingBalance(movement.projectedAmountClp, movement.payments).toString(),
+          pendingBefore: pendingBalance(payableAmountClp(movement), movement.payments).toString(),
           movementStatusAfter: updatedMovement.status
         }
       }
@@ -426,7 +427,7 @@ export async function cancelPaymentAction(formData: FormData) {
       }
     });
     const nextPayments = payment.movement.payments.map((item) => (item.id === cancelled.id ? cancelled : item));
-    const nextStatus = statusFromPayments(payment.movement.projectedAmountClp, nextPayments);
+    const nextStatus = statusFromMovementPayments(payment.movement, nextPayments);
     const updatedMovement = await tx.movement.update({
       where: { id: payment.movementId },
       data: {

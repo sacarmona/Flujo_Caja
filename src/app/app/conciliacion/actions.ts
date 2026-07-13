@@ -8,7 +8,7 @@ import { parseBankStatementFile, type BankStatementRawRow } from "@/lib/bank-sta
 import { todayInAppTimeZone } from "@/lib/format";
 import { mondayOfWeek } from "@/lib/calendar-view";
 import { parseRequiredDate, validateMovementInput, type MovementFormInput } from "@/lib/movements";
-import { nextRealDateAfterPayment, pendingBalance, statusFromPayments, validatePaymentAmount } from "@/lib/payments";
+import { nextRealDateAfterPayment, pendingBalanceForMovement, statusFromMovementPayments, validatePaymentAmount } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import {
   assertCanManageReconciliation,
@@ -72,7 +72,7 @@ export async function loadCandidates(companyId: string, bankAccountId: string, f
     // otra moneda, projectedAmountClp (no movement.amount, en su moneda
     // original) es lo comparable, ya que los Payment de conciliacion
     // siempre se registran en CLP (ver registerReconciliationPayment).
-    pending: pendingBalance(movement.projectedAmountClp, movement.payments)
+    pending: pendingBalanceForMovement(movement, movement.payments)
   }));
 }
 
@@ -239,7 +239,7 @@ async function registerReconciliationPayment(params: {
 
   const amount = validatePaymentAmount({ movement, existingPayments: movement.payments, amount: params.amount.toString() });
   const nextPayments = [...movement.payments, { amount }];
-  const nextStatus = statusFromPayments(movement.projectedAmountClp, nextPayments);
+  const nextStatus = statusFromMovementPayments(movement, nextPayments);
   const nextRealDate = nextRealDateAfterPayment({ currentRealDate: movement.realDate, nextStatus, paidAt: params.paidAt });
 
   const payment = await params.tx.payment.create({
@@ -516,7 +516,7 @@ export async function reverseReconciliationAction(formData: FormData) {
           data: { cancelledAt: new Date(), cancelReason: reason ?? "Reversion de conciliacion bancaria" }
         });
         const nextPayments = payment.movement.payments.map((item) => (item.id === cancelled.id ? cancelled : item));
-        const nextStatus = statusFromPayments(payment.movement.projectedAmountClp, nextPayments);
+        const nextStatus = statusFromMovementPayments(payment.movement, nextPayments);
         await tx.movement.update({
           where: { id: payment.movementId },
           data: { status: nextStatus, realDate: nextStatus === "PAID_OR_COLLECTED" ? payment.movement.realDate : null }

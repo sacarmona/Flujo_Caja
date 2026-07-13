@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   assertCanRegisterPayment,
   nextRealDateAfterPayment,
+  pendingBalanceForMovement,
+  statusFromMovementPayments,
   pendingBalance,
   statusFromPayments,
   totalPaid,
@@ -10,8 +12,8 @@ import {
 
 const movement = {
   amount: "100000",
-  projectedAmountClp: "100000",
   currency: "CLP" as const,
+  projectedAmountClp: "100000",
   status: "PENDING" as const,
   cancelledAt: null,
   deletedAt: null
@@ -76,6 +78,34 @@ describe("payment rules", () => {
     const amount = validatePaymentAmount({ movement: foreignMovement, existingPayments: [], amount: "950000" });
 
     expect(amount.toString()).toBe("950000");
-    expect(statusFromPayments(foreignMovement.projectedAmountClp, [{ amount }])).toBe("PAID_OR_COLLECTED");
+    expect(statusFromMovementPayments(foreignMovement, [{ amount }])).toBe("PAID_OR_COLLECTED");
+  });
+
+  it("allows CLP payments for UF movements using the stored projected CLP amount", () => {
+    const ufMovement = {
+      ...movement,
+      amount: "148.16",
+      currency: "UF" as const,
+      projectedAmountClp: "6051155"
+    };
+    const payments = [{ amount: "1000000" }];
+
+    expect(pendingBalanceForMovement(ufMovement, payments).toString()).toBe("5051155");
+    expect(statusFromMovementPayments(ufMovement, payments)).toBe("PARTIALLY_PAID");
+    expect(validatePaymentAmount({ movement: ufMovement, existingPayments: payments, amount: "5051155" }).toString()).toBe("5051155");
+    expect(statusFromMovementPayments(ufMovement, [...payments, { amount: "5051155" }])).toBe("PAID_OR_COLLECTED");
+  });
+
+  it("rejects CLP payments above the pending CLP balance for foreign currency movements", () => {
+    const usdMovement = {
+      ...movement,
+      amount: "1000",
+      currency: "USD" as const,
+      projectedAmountClp: "950000"
+    };
+
+    expect(() => validatePaymentAmount({ movement: usdMovement, existingPayments: [{ amount: "900000" }], amount: "50001" })).toThrow(
+      "saldo pendiente"
+    );
   });
 });
