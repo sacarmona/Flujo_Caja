@@ -2,12 +2,12 @@ import { cancelPaymentAction, registerPaymentAction } from "@/app/app/movimiento
 import type { MovementWithRelations } from "@/app/app/movimientos/shared";
 import { AmountInput } from "@/components/amount-input";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { pendingBalance, totalPaid } from "@/lib/payments";
+import { pendingBalanceForMovement, totalPaid } from "@/lib/payments";
 
 export function PaymentPanel({ canWrite, movement }: { canWrite: boolean; movement: MovementWithRelations }) {
   const paid = totalPaid(movement.payments);
-  const pending = pendingBalance(movement.projectedAmountClp, movement.payments);
-  const canRegisterPayment = canWrite && movement.status !== "CANCELLED" && movement.currency === "CLP" && pending.gt(0);
+  const pending = pendingBalanceForMovement(movement, movement.payments);
+  const canRegisterPayment = canWrite && movement.status !== "CANCELLED" && pending.gt(0);
 
   return (
     <section className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -50,7 +50,9 @@ export function PaymentPanel({ canWrite, movement }: { canWrite: boolean; moveme
       ) : null}
 
       {movement.currency !== "CLP" ? (
-        <p className="mt-4 text-sm text-slate-500">Los pagos de movimientos en {movement.currency} se habilitaran cuando exista tipo de cambio.</p>
+        <p className="mt-4 text-sm text-slate-500">
+          Este movimiento esta expresado en {movement.currency}; los pagos se registran en CLP usando la tasa historica guardada.
+        </p>
       ) : null}
 
       <div className="mt-4">

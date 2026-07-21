@@ -35,6 +35,18 @@ export function pendingBalance(movementAmount: Prisma.Decimal | number | string,
   return pending.isNegative() ? new Prisma.Decimal(0) : pending;
 }
 
+export function payableAmountClp(movement: Pick<PayableMovement, "amount" | "projectedAmountClp">): Prisma.Decimal {
+  return decimal(movement.projectedAmountClp);
+}
+
+export function pendingBalanceForMovement(movement: PayableMovement, payments: PaymentLike[]): Prisma.Decimal {
+  return pendingBalance(payableAmountClp(movement), payments);
+}
+
+export function statusFromMovementPayments(movement: PayableMovement, payments: PaymentLike[]): MovementStatus {
+  return statusFromPayments(payableAmountClp(movement), payments);
+}
+
 export function statusFromPayments(movementAmount: Prisma.Decimal | number | string, payments: PaymentLike[]): MovementStatus {
   const paid = totalPaid(payments);
 
@@ -77,7 +89,12 @@ export function validatePaymentAmount(params: {
     throw new Error("El monto del pago debe ser positivo.");
   }
 
-  const pending = pendingBalance(params.movement.projectedAmountClp, params.existingPayments);
+  const payable = payableAmountClp(params.movement);
+  if (!payable.isFinite() || payable.lte(0)) {
+    throw new Error("El movimiento no tiene un monto CLP valido para registrar pagos.");
+  }
+
+  const pending = pendingBalance(payable, params.existingPayments);
 
   if (amount.gt(pending)) {
     throw new Error("El pago no puede superar el saldo pendiente.");
