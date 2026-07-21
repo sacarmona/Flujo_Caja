@@ -1,41 +1,17 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, CheckCircle2, CircleDot, WalletCards } from "lucide-react";
-import type { Currency, MovementStatus, MovementType } from "@prisma/client";
-import { calculateSantanderCashFlow } from "@/lib/cash-flow-service";
-import {
-  buildCalendarRows,
-  buildMovementTooltipIndex,
-  calendarAccumulatedBalances,
-  calendarCellAmount,
-  calendarMode,
-  calendarMonths,
-  calendarStatusToken,
-  cellTooltip,
-  groupDaysByWeek,
-  mondayOfWeek,
-  movementCellHref,
-  type CalendarMode
-} from "@/lib/calendar-view";
+import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, CheckCircle2, CircleDot, Download, WalletCards } from "lucide-react";
+import type { MovementStatus, MovementType } from "@prisma/client";
+import { getCalendarData, type CalendarSearchParams } from "@/app/app/calendario/data";
+import { calendarCellAmount, calendarStatusToken, cellTooltip, movementCellHref, type CalendarMode } from "@/lib/calendar-view";
 import { dateKey } from "@/lib/recurrences";
 import { SavedBanner } from "@/components/saved-banner";
-import { formatCurrency, todayInAppTimeZone } from "@/lib/format";
+import { formatCurrency } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
-import { getHolidayKeys } from "@/lib/holidays-cl";
 import { movementCurrencies, movementStatuses, movementTypes } from "@/lib/movements";
-import { canManageOpeningBalances, dateInputValue, effectiveOpeningBalance, suggestedOpeningBalanceWeek } from "@/lib/opening-balances";
-import { prisma } from "@/lib/prisma";
+import { canManageOpeningBalances, dateInputValue } from "@/lib/opening-balances";
 import { removeOpeningBalanceAction, updateOpeningBalanceAction } from "./actions";
 
-type SearchParams = {
-  months?: string;
-  mode?: CalendarMode;
-  collapsed?: string;
-  businessUnitId?: string;
-  accountingAccountId?: string;
-  status?: MovementStatus;
-  type?: MovementType;
-  currency?: Currency;
-};
+type SearchParams = CalendarSearchParams;
 
 type CalendarioPageProps = {
   searchParams: Promise<SearchParams>;
@@ -89,47 +65,6 @@ function Indicator({ token }: { token: string }) {
   return <CircleDot aria-label="Sin movimiento" className="size-3.5 text-slate-400" />;
 }
 
-async function getReferenceData(companyId: string) {
-  const [businessUnits, accounts] = await Promise.all([
-    prisma.businessUnit.findMany({ where: { companyId, isActive: true, deletedAt: null }, orderBy: { name: "asc" } }),
-    prisma.accountingAccount.findMany({
-      where: { companyId, deletedAt: null, allowMovements: true },
-      include: { parent: true },
-      orderBy: [{ code: "asc" }]
-    })
-  ]);
-
-  return { businessUnits, accounts };
-}
-
-async function getMovementTooltips(companyId: string, filters: SearchParams, startDate: Date, endDate: Date) {
-  const movements = await prisma.movement.findMany({
-    where: {
-      companyId,
-      deletedAt: null,
-      cancelledAt: null,
-      status: { not: "CANCELLED" },
-      bankAccount: { name: "Cuenta Corriente Santander" },
-      projectedDate: { gte: startDate, lte: endDate },
-      ...(filters.businessUnitId ? { businessUnitId: filters.businessUnitId } : {}),
-      ...(filters.accountingAccountId ? { accountingAccountId: filters.accountingAccountId } : {}),
-      ...(filters.status ? { status: filters.status } : {}),
-      ...(filters.type ? { type: filters.type } : {}),
-      ...(filters.currency ? { currency: filters.currency } : {})
-    },
-    select: { description: true, projectedAmountClp: true, accountingAccountId: true, projectedDate: true }
-  });
-
-  return buildMovementTooltipIndex(
-    movements.map((movement) => ({
-      description: movement.description,
-      amount: movement.projectedAmountClp,
-      accountingAccountId: movement.accountingAccountId,
-      projectedDate: movement.projectedDate
-    }))
-  );
-}
-
 function toggleCollapsedHref(category: string, filters: SearchParams, collapsed: Set<string>) {
   const next = new Set(collapsed);
   if (next.has(category)) next.delete(category);
@@ -147,72 +82,36 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
   const user = await getCurrentUser();
   if (!user) return null;
 
-  const months = calendarMonths(filters.months);
-  const mode = calendarMode(filters.mode);
-  const today = todayInAppTimeZone();
   /**
    * La grilla siempre arranca el lunes de la semana en curso (no "hoy"), asi
    * los usuarios ven tambien los dias ya pasados de esta semana. Solo avanza
    * al iniciar la semana siguiente, no dia a dia.
    */
-  const startDate = mondayOfWeek(today);
+  const collapsed = new Set((filters.collapsed ?? "").split("|").filter(Boolean));
+  const {
+    months,
+    mode,
+    startDate,
+    referenceData,
+    lateMovementsCount,
+    result,
+    movementTooltips,
+    rows,
+    weeks,
+    balances,
+    suggestedOpening,
+    confirmedForSuggestedWeek,
+    headlineOpeningBalance,
+    currentDay,
+    currentRealBalance
+  } = await getCalendarData(user.companyId, filters, { collapsedCategories: collapsed });
   const lastWeekStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() - 7);
   const lastWeekEnd = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() - 1);
-  const collapsed = new Set((filters.collapsed ?? "").split("|").filter(Boolean));
-  const [referenceData, holidays, lateMovementsCount] = await Promise.all([
-    getReferenceData(user.companyId),
-    getHolidayKeys(prisma),
-    prisma.movement.count({
-      where: { companyId: user.companyId, deletedAt: null, status: { in: ["PROJECTED", "PENDING"] }, projectedDate: { lt: today } }
-    })
-  ]);
-  const result = await calculateSantanderCashFlow({
-    prisma,
-    companyId: user.companyId,
-    startDate,
-    months,
-    holidays,
-    filters: {
-      businessUnitId: filters.businessUnitId,
-      accountingAccountId: filters.accountingAccountId,
-      status: filters.status,
-      type: filters.type,
-      currency: filters.currency
-    }
-  });
-  const movementTooltips = await getMovementTooltips(
-    user.companyId,
-    filters,
-    result.days[0]?.date ?? startDate,
-    result.days.at(-1)?.date ?? startDate
-  );
-  const accounts = referenceData.accounts.map((account) => ({
-    id: account.id,
-    code: account.code,
-    name: account.name,
-    parentName: account.parent?.name ?? "Sin categoria",
-    parentCode: account.parent?.code ?? "9999"
-  }));
-  const rows = buildCalendarRows(accounts, collapsed);
-  const weeks = groupDaysByWeek(result.days);
-  const balances = calendarAccumulatedBalances(result.days, mode, result.openingBalance, result.confirmedBalances);
-  const suggestedOpening = suggestedOpeningBalanceWeek(result, weeks);
-  const confirmedForSuggestedWeek = suggestedOpening ? result.confirmedBalances.get(dateKey(suggestedOpening.date)) : undefined;
   const canEditOpeningBalance = canManageOpeningBalances(user.role);
-  const headlineOpeningBalance = effectiveOpeningBalance(result);
-  /**
-   * Saldo diario actual: saldo acumulado del dia de hoy (o el siguiente dia
-   * habil si hoy no lo es) calculado solo con movimientos Parcial y
-   * Pagado/Cobrado (Modo Real), independiente del Modo seleccionado en el
-   * filtro. Se actualiza solo cuando se concilian/registran pagos, no con
-   * el solo paso de los dias, para que el usuario vea de inmediato el
-   * impacto de actualizar el saldo inicial de la semana en curso.
-   */
-  const currentDay = [...result.days].reverse().find((day) => day.date <= today) ?? result.days[0];
-  const currentRealBalance = currentDay
-    ? calendarAccumulatedBalances(result.days, "real", result.openingBalance, result.confirmedBalances).get(dateKey(currentDay.date)) ??
-      result.openingBalance
-    : result.openingBalance;
+  /** Mismos filtros que la vista actual (sin "collapsed", que no aplica al Excel: el export siempre trae el detalle completo). */
+  const exportQuery = new URLSearchParams(
+    Object.entries({ ...filters, collapsed: undefined }).filter((entry): entry is [string, string] => Boolean(entry[1]))
+  ).toString();
 
   return (
     <section className="max-w-none">
@@ -306,6 +205,16 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
           Aplicar
         </button>
       </form>
+
+      <div className="mt-3 flex justify-end">
+        <Link
+          className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-adentu-blue hover:text-adentu-blue"
+          href={`/app/calendario/export?${exportQuery}`}
+        >
+          <Download aria-hidden className="size-3.5" />
+          Descargar Excel
+        </Link>
+      </div>
 
       <section className="mt-4 flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 bg-white px-4 py-3">
         <span className="rounded-md bg-adentu-mist p-2 text-adentu-blue">
