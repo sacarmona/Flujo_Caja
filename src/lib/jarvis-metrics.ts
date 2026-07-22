@@ -1,7 +1,9 @@
 import type { PrismaClient } from "@prisma/client";
+import { calendarAccumulatedBalances } from "./calendar-view";
 import { calculateSantanderCashFlow } from "./cash-flow-service";
 import { formatCurrency, todayInAppTimeZone } from "./format";
 import { getHolidayKeys } from "./holidays-cl";
+import { dateKey } from "./recurrences";
 
 export type JarvisDailyBalanceMetric = {
   app: "flujo_caja";
@@ -12,7 +14,7 @@ export type JarvisDailyBalanceMetric = {
   incomeToday: number;
   expenseToday: number;
   netToday: number;
-  source: "dashboard";
+  source: "real";
   summary: string;
   byAccount: Array<{
     name: string;
@@ -24,6 +26,13 @@ function decimalToIntegerNumber(value: { toString(): string }): number {
   return Math.round(Number(value.toString()));
 }
 
+/**
+ * Usa Modo Real (solo movimientos Parcial/Pagado-Cobrado, dinero
+ * efectivamente movido) en vez del combinado Proyectado+Pendiente que usa
+ * el dashboard. Reutiliza calendarAccumulatedBalances, la misma funcion que
+ * usa el Calendario para Modo Real, para no duplicar la logica de acumular
+ * saldo respetando saldos confirmados por el usuario.
+ */
 export async function getJarvisDailyBalanceMetric(prisma: PrismaClient, asOf = new Date()): Promise<JarvisDailyBalanceMetric> {
   const company = await prisma.company.findFirst({ select: { id: true } });
   if (!company) {
@@ -40,10 +49,12 @@ export async function getJarvisDailyBalanceMetric(prisma: PrismaClient, asOf = n
     holidays
   });
   const todayBalance = cashFlow.days.at(-1);
-  const balance = todayBalance?.accumulatedBalance ?? cashFlow.openingBalance;
-  const incomeToday = todayBalance ? todayBalance.projectedIncome.plus(todayBalance.pendingIncome) : cashFlow.openingBalance.mul(0);
-  const expenseToday = todayBalance ? todayBalance.projectedExpense.plus(todayBalance.pendingExpense) : cashFlow.openingBalance.mul(0);
-  const netToday = todayBalance?.netFlow ?? cashFlow.openingBalance.mul(0);
+  const incomeToday = todayBalance?.realIncome ?? cashFlow.openingBalance.mul(0);
+  const expenseToday = todayBalance?.realExpense ?? cashFlow.openingBalance.mul(0);
+  const netToday = incomeToday.minus(expenseToday);
+
+  const realBalances = calendarAccumulatedBalances(cashFlow.days, "real", cashFlow.openingBalance, cashFlow.confirmedBalances);
+  const balance = realBalances.get(dateKey(today)) ?? cashFlow.openingBalance;
 
   return {
     app: "flujo_caja",
@@ -54,8 +65,8 @@ export async function getJarvisDailyBalanceMetric(prisma: PrismaClient, asOf = n
     incomeToday: decimalToIntegerNumber(incomeToday),
     expenseToday: decimalToIntegerNumber(expenseToday),
     netToday: decimalToIntegerNumber(netToday),
-    source: "dashboard",
-    summary: `Saldo diario actual: ${formatCurrency(decimalToIntegerNumber(balance))} CLP`,
+    source: "real",
+    summary: `Saldo diario actual (Modo Real): ${formatCurrency(decimalToIntegerNumber(balance))} CLP`,
     byAccount: [
       {
         name: "Cuenta Corriente Santander",
