@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import type { MovementType } from "@prisma/client";
@@ -168,45 +169,51 @@ export async function uploadBankStatementAction(formData: FormData) {
         }
       });
 
-      for (const raw of rawRows) {
-        await tx.bankImportRow.create({
-          data: {
-            batchId: batch.id,
-            rowNumber: raw.rowNumber,
-            rawData: JSON.parse(
-              JSON.stringify({
-                fecha: raw.date,
-                monto: raw.amount.toString(),
-                tipo: raw.type,
-                descripcion: raw.description,
-                referencia: raw.reference,
-                sucursal: raw.branch
-              })
-            )
-          }
-        });
+      /**
+       * Inserciones en lote (3 consultas en total, sin importar cuantas filas
+       * traiga la cartola): antes eran 3 inserts secuenciales por fila, y
+       * contra Neon cada round-trip cuesta ~100ms, asi que una cartola de
+       * 120 filas tardaba ~40s. Los ids de BankMovement se generan aqui
+       * (createMany no devuelve los ids creados) para poder enlazar las
+       * Reconciliation en el mismo lote.
+       */
+      await tx.bankImportRow.createMany({
+        data: rawRows.map((raw) => ({
+          batchId: batch.id,
+          rowNumber: raw.rowNumber,
+          rawData: JSON.parse(
+            JSON.stringify({
+              fecha: raw.date,
+              monto: raw.amount.toString(),
+              tipo: raw.type,
+              descripcion: raw.description,
+              referencia: raw.reference,
+              sucursal: raw.branch
+            })
+          )
+        }))
+      });
 
-        const bankMovement = await tx.bankMovement.create({
-          data: {
-            batchId: batch.id,
-            bankAccountId,
-            date: raw.date,
-            amount: raw.amount,
-            type: raw.type,
-            description: raw.description,
-            reference: raw.reference
-          }
-        });
+      const movementIds = rawRows.map(() => randomUUID());
+      await tx.bankMovement.createMany({
+        data: rawRows.map((raw, index) => ({
+          id: movementIds[index],
+          batchId: batch.id,
+          bankAccountId,
+          date: raw.date,
+          amount: raw.amount,
+          type: raw.type,
+          description: raw.description,
+          reference: raw.reference
+        }))
+      });
 
-        const match = matchBankRow(raw, candidates);
-        await tx.reconciliation.create({
-          data: {
-            bankMovementId: bankMovement.id,
-            movementId: match.movementId,
-            matchLevel: match.matchLevel
-          }
-        });
-      }
+      await tx.reconciliation.createMany({
+        data: rawRows.map((raw, index) => {
+          const match = matchBankRow(raw, candidates);
+          return { bankMovementId: movementIds[index], movementId: match.movementId, matchLevel: match.matchLevel };
+        })
+      });
     }, { timeout: 60000, maxWait: 10000 });
   } catch (error) {
     return redirectWithError("/app/conciliacion", error instanceof Error ? error.message : "No se pudo importar la cartola.");
