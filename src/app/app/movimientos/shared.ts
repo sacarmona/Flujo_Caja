@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import type { MovementStatus, MovementType } from "@prisma/client";
-import { formatAmountNumber, formatCurrency, todayInAppTimeZone } from "@/lib/format";
+import { formatAmountNumber, formatCurrency, formatDate, todayInAppTimeZone } from "@/lib/format";
 import { weekOfYear } from "@/lib/iso-week";
 
 export const typeLabels: Record<MovementType, string> = {
@@ -74,6 +74,41 @@ export function todayInputValue(): string {
 
 export function formatAmount(amount: { toString(): string } | number, currency: string) {
   return currency === "CLP" ? formatCurrency(Number(amount)) : `${formatAmountNumber(amount.toString())} ${currency}`;
+}
+
+type SearchableMovement = {
+  description: string;
+  type: MovementType;
+  status: MovementStatus;
+  projectedDate: Date;
+  amount: { toString(): string };
+  accountingAccount: { code: string | null; name: string };
+  bankAccount?: { name: string } | null;
+  businessUnit?: { name: string } | null;
+  costCenter?: { name: string } | null;
+  project?: { name: string } | null;
+};
+
+/**
+ * Textos sobre los que busca el buscador del listado. Lo usan el filtro
+ * inmediato del navegador (pagina cargada) y la busqueda en el servidor
+ * (todas las paginas), para que ambos coincidan siempre.
+ */
+export function movementSearchFields(movement: SearchableMovement): Array<string | null | undefined> {
+  const amount = movement.amount.toString();
+  return [
+    movement.description,
+    optionLabel(movement.accountingAccount.code, movement.accountingAccount.name),
+    movement.bankAccount?.name,
+    movement.businessUnit?.name,
+    movement.costCenter?.name,
+    movement.project?.name,
+    typeLabels[movement.type],
+    statusLabels[movement.status],
+    formatDate(movement.projectedDate),
+    amount,
+    formatAmountNumber(amount)
+  ];
 }
 
 /**

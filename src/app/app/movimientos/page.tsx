@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import type { MovementStatus, MovementType } from "@prisma/client";
 import { createMovementAction, getMovementDefaults } from "@/app/app/movimientos/actions";
 import { MovementForm } from "@/app/app/movimientos/movement-form";
-import { groupByWeek, movementInclude, serializeMovementForForm, statusLabels, typeLabels } from "@/app/app/movimientos/shared";
+import { groupByWeek, movementInclude, movementSearchFields, serializeMovementForForm, statusLabels, typeLabels } from "@/app/app/movimientos/shared";
 import { WeeklyMovementsTable } from "@/app/app/movimientos/weekly-movements-table";
 import { Pagination } from "@/components/pagination";
 import { SavedBanner } from "@/components/saved-banner";
@@ -12,6 +12,7 @@ import { formatCurrency, todayInAppTimeZone } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { getHolidayKeys } from "@/lib/holidays-cl";
 import { weekKeyOf } from "@/lib/iso-week";
+import { matchesSearch } from "@/lib/movement-search";
 import { canModifyMovements, isLateMovement, movementStatuses, movementTypes } from "@/lib/movements";
 import { prisma } from "@/lib/prisma";
 
@@ -28,6 +29,7 @@ type SearchParams = {
   recurrenceRuleId?: string;
   late?: string;
   range?: string;
+  q?: string;
 };
 
 /** El filtro de Estado admite seleccionar varios (select multiple); normaliza el valor crudo del querystring (string, string[] o ausente) a la lista de estados validos. */
@@ -138,13 +140,14 @@ function currentWeekFloor(filters: SearchParams, late: boolean): Date | null {
   return mondayOfWeek(todayInAppTimeZone());
 }
 
-function movementsWhere(companyId: string, filters: SearchParams) {
+function movementsWhere(companyId: string, filters: SearchParams, searchIds?: string[]) {
   const late = filters.late === "true";
   const weekFloor = currentWeekFloor(filters, late);
   const statuses = statusValues(filters);
   return {
     companyId,
     deletedAt: null,
+    ...(searchIds ? { id: { in: searchIds } } : {}),
     ...(filters.type ? { type: filters.type } : {}),
     ...(late ? { status: { in: ["PROJECTED", "PENDING"] as MovementStatus[] } } : statuses.length > 0 ? { status: { in: statuses } } : {}),
     ...(filters.accountingAccountId ? { accountingAccountId: filters.accountingAccountId } : {}),
@@ -179,9 +182,9 @@ const statusPriority: Record<MovementStatus, number> = {
   CANCELLED: 5
 };
 
-async function getMovements(companyId: string, filters: SearchParams) {
+async function getMovements(companyId: string, filters: SearchParams, searchIds?: string[]) {
   const page = Math.max(Number(filters.page ?? 1) || 1, 1);
-  const where = movementsWhere(companyId, filters);
+  const where = movementsWhere(companyId, filters, searchIds);
 
   const [items, total] = await Promise.all([
     prisma.movement.findMany({
@@ -208,9 +211,9 @@ async function getMovements(companyId: string, filters: SearchParams) {
  * Santander (requisito del motor de Calendario), no se muestra el saldo en
  * vez de romper el listado completo.
  */
-async function getWeeklyBalances(companyId: string, filters: SearchParams) {
+async function getWeeklyBalances(companyId: string, filters: SearchParams, searchIds?: string[]) {
   try {
-    const where = movementsWhere(companyId, filters);
+    const where = movementsWhere(companyId, filters, searchIds);
     const range = await prisma.movement.aggregate({
       where,
       _min: { projectedDate: true },
@@ -244,6 +247,31 @@ async function getWeeklyBalances(companyId: string, filters: SearchParams) {
   }
 }
 
+/**
+ * Busqueda de texto en todas las paginas: aplica los mismos filtros y compara
+ * con los mismos textos que el buscador del navegador (sin tildes ni
+ * mayusculas), y devuelve los ids que coinciden para filtrar el listado.
+ */
+async function searchMovementIds(companyId: string, filters: SearchParams, query: string) {
+  const candidates = await prisma.movement.findMany({
+    where: movementsWhere(companyId, filters),
+    select: {
+      id: true,
+      description: true,
+      type: true,
+      status: true,
+      projectedDate: true,
+      amount: true,
+      accountingAccount: { select: { code: true, name: true } },
+      bankAccount: { select: { name: true } },
+      businessUnit: { select: { name: true } },
+      costCenter: { select: { name: true } },
+      project: { select: { name: true } }
+    }
+  });
+  return candidates.filter((movement) => matchesSearch(query, movementSearchFields(movement))).map((movement) => movement.id);
+}
+
 function pageHref(page: number, filters: SearchParams) {
   const params = new URLSearchParams();
   Object.entries({ ...filters, page: String(page) }).forEach(([key, value]) => {
@@ -264,11 +292,14 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
     return null;
   }
 
+  const query = filters.q?.trim() ?? "";
+  const searchIds = query ? await searchMovementIds(user.companyId, filters, query) : undefined;
+
   const [referenceData, defaults, result, weeklyBalances] = await Promise.all([
     getReferenceData(user.companyId),
     getMovementDefaults(user.companyId),
-    getMovements(user.companyId, filters),
-    getWeeklyBalances(user.companyId, filters)
+    getMovements(user.companyId, filters, searchIds),
+    getWeeklyBalances(user.companyId, filters, searchIds)
   ]);
   const canWrite = canModifyMovements(user.role);
   const today = todayInAppTimeZone();
@@ -291,6 +322,7 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
       </div>
 
       <form className="mt-6 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-9">
+        {query ? <input name="q" type="hidden" value={query} /> : null}
         <label className="text-sm">
           <span className="mb-1 block text-slate-600">Rango</span>
           <select className="w-full rounded-md border border-slate-300 px-2 py-2" name="range" defaultValue={filters.range === "all" ? "all" : "current"}>
@@ -386,12 +418,12 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
           </p>
         </div>
 
-        {result.items.length === 0 ? (
+        {result.items.length === 0 && !query ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">
             No hay movimientos para los filtros seleccionados.
           </div>
         ) : (
-          <WeeklyMovementsTable canWrite={canWrite} lateMovementIds={lateMovementIds} weeks={weeks} />
+          <WeeklyMovementsTable canWrite={canWrite} initialQuery={query} lateMovementIds={lateMovementIds} weeks={weeks} />
         )}
 
         <div className="flex justify-end">
