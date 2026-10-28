@@ -2,6 +2,8 @@ import Link from "next/link";
 import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, CheckCircle2, CircleDot, Download, WalletCards } from "lucide-react";
 import type { MovementStatus, MovementType } from "@prisma/client";
 import { getCalendarData, type CalendarSearchParams } from "@/app/app/calendario/data";
+import { CalendarChart } from "@/components/calendar-chart";
+import { buildCalendarChartPoints } from "@/lib/calendar-chart";
 import { calendarCellAmount, calendarStatusToken, cellTooltip, movementCellHref, type CalendarMode } from "@/lib/calendar-view";
 import { dateKey } from "@/lib/recurrences";
 import { SavedBanner } from "@/components/saved-banner";
@@ -108,6 +110,7 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
   const lastWeekStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() - 7);
   const lastWeekEnd = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() - 1);
   const canEditOpeningBalance = canManageOpeningBalances(user.role);
+  const chartPoints = buildCalendarChartPoints(result.days, mode, balances);
   /** Mismos filtros que la vista actual (sin "collapsed", que no aplica al Excel: el export siempre trae el detalle completo). */
   const exportQuery = new URLSearchParams(
     Object.entries({ ...filters, collapsed: undefined }).filter((entry): entry is [string, string] => Boolean(entry[1]))
@@ -329,6 +332,18 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
           Ver movimientos de la semana pasada
         </Link>
       </div>
+
+      <details className="group mt-6 rounded-lg border border-slate-200 bg-white" open>
+        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-adentu-ink">
+          <span className="inline-flex items-center gap-2">
+            <span className="text-adentu-blue transition-transform group-open:rotate-90">▶</span>
+            Grafico diario ({modeLabels[mode]})
+          </span>
+        </summary>
+        <div className="border-t border-slate-200 p-4">
+          <CalendarChart points={chartPoints} />
+        </div>
+      </details>
 
       <div className="mt-6 max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white">
         <table className="border-collapse text-sm">
