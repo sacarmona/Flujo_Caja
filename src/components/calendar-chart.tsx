@@ -35,12 +35,12 @@ function longDate(iso: string): string {
  * Grafico diario del Calendario: Ingresos totales, Gastos totales y Saldo
  * diario como lineas, con sus minimos/maximos marcados. Ingresos y gastos son
  * flujos diarios (cientos de miles) y el saldo es un acumulado (millones), por
- * eso por defecto usan ejes separados (izquierda: flujos, derecha: saldo);
- * "Escala comun" los dibuja sobre un mismo eje para compararlos 1:1.
+ * eso usan ejes separados (izquierda: flujos, derecha: saldo) si se desmarca;
+ * "Escala comun" (por defecto) los dibuja sobre un mismo eje para compararlos 1:1.
  */
 export function CalendarChart({ points }: { points: CalendarChartPoint[] }) {
   const [visible, setVisible] = useState<Record<ChartSeriesKey, boolean>>({ income: true, expense: true, balance: true });
-  const [commonScale, setCommonScale] = useState(false);
+  const [commonScale, setCommonScale] = useState(true);
   const [smooth, setSmooth] = useState(true);
   const [hover, setHover] = useState<number | null>(null);
 
