@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Prisma } from "@prisma/client";
-import { buildCalendarChartPoints, niceTicks, seriesExtremes } from "./calendar-chart";
+import { buildCalendarChartPoints, niceTicks, seriesExtremes, smoothPath } from "./calendar-chart";
 import type { CashFlowDay } from "./cash-flow";
 
 function zero() {
@@ -48,6 +48,17 @@ describe("calendar chart", () => {
     expect(seriesExtremes(points, "balance")).toEqual({ min: { index: 1, value: 720 }, max: { index: 2, value: 1210 } });
     expect(seriesExtremes(points, "expense")).toEqual({ min: { index: 2, value: 10 }, max: { index: 1, value: 300 } });
     expect(seriesExtremes([], "income")).toBeNull();
+  });
+
+  it("suaviza con spline monotona sin sobrepasar los puntos extremos", () => {
+    const path = smoothPath([{ x: 0, y: 10 }, { x: 10, y: 0 }, { x: 20, y: 0 }, { x: 30, y: 10 }]);
+
+    expect(path.startsWith("M0,10 C")).toBe(true);
+    expect(path.endsWith(" 30,10")).toBe(true);
+    const ys = [...path.matchAll(/C([\d.]+),([-\d.]+) ([\d.]+),([-\d.]+)/g)].flatMap((m) => [Number(m[2]), Number(m[4])]);
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...ys)).toBeLessThanOrEqual(10);
+    expect(smoothPath([])).toBe("");
   });
 
   it("genera marcas de eje redondas que cubren el rango", () => {

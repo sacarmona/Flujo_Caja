@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { niceTicks, seriesExtremes, type CalendarChartPoint, type ChartSeriesKey } from "@/lib/calendar-chart";
+import { niceTicks, seriesExtremes, smoothPath, type CalendarChartPoint, type ChartSeriesKey } from "@/lib/calendar-chart";
 import { formatCurrency } from "@/lib/format";
 
 const WIDTH = 1000;
@@ -41,6 +41,7 @@ function longDate(iso: string): string {
 export function CalendarChart({ points }: { points: CalendarChartPoint[] }) {
   const [visible, setVisible] = useState<Record<ChartSeriesKey, boolean>>({ income: true, expense: true, balance: true });
   const [commonScale, setCommonScale] = useState(false);
+  const [smooth, setSmooth] = useState(true);
   const [hover, setHover] = useState<number | null>(null);
 
   const innerWidth = WIDTH - MARGIN.left - MARGIN.right;
@@ -100,11 +101,18 @@ export function CalendarChart({ points }: { points: CalendarChartPoint[] }) {
         {SERIES.map(({ key, label, color }) => (
           <label className="inline-flex cursor-pointer items-center gap-2" key={key}>
             <input checked={visible[key]} onChange={() => setVisible((current) => ({ ...current, [key]: !current[key] }))} type="checkbox" />
-            <span className="inline-block h-0.5 w-5" style={{ backgroundColor: color }} />
+            <span
+              className="inline-block h-0.5 w-5"
+              style={key === "balance" ? { backgroundImage: `repeating-linear-gradient(90deg, ${color} 0 6px, transparent 6px 9px)` } : { backgroundColor: color }}
+            />
             {label}
           </label>
         ))}
         <label className="ml-auto inline-flex cursor-pointer items-center gap-2 text-slate-600">
+          <input checked={smooth} onChange={() => setSmooth((current) => !current)} type="checkbox" />
+          Suavizar lineas
+        </label>
+        <label className="inline-flex cursor-pointer items-center gap-2 text-slate-600">
           <input checked={commonScale} onChange={() => setCommonScale((current) => !current)} type="checkbox" />
           Escala comun (un solo eje)
         </label>
@@ -139,16 +147,23 @@ export function CalendarChart({ points }: { points: CalendarChartPoint[] }) {
             ) : null
           )}
 
-          {SERIES.filter(({ key }) => visible[key]).map(({ key, color }) => (
-            <polyline
-              fill="none"
-              key={key}
-              points={points.map((point, index) => `${x(index)},${yFor(key, point[key])}`).join(" ")}
-              stroke={color}
-              strokeLinejoin="round"
-              strokeWidth="2"
-            />
-          ))}
+          {SERIES.filter(({ key }) => visible[key]).map(({ key, color }) => {
+            const coords = points.map((point, index) => ({ x: x(index), y: yFor(key, point[key]) }));
+            const dash = key === "balance" ? "8 5" : undefined;
+            return smooth ? (
+              <path d={smoothPath(coords)} fill="none" key={key} stroke={color} strokeDasharray={dash} strokeLinecap="round" strokeWidth={key === "balance" ? 2.5 : 2} />
+            ) : (
+              <polyline
+                fill="none"
+                key={key}
+                points={coords.map((c) => `${c.x},${c.y}`).join(" ")}
+                stroke={color}
+                strokeDasharray={dash}
+                strokeLinejoin="round"
+                strokeWidth={key === "balance" ? 2.5 : 2}
+              />
+            );
+          })}
 
           {SERIES.filter(({ key }) => visible[key]).flatMap(({ key, color }) => {
             const found = extremes[key];
