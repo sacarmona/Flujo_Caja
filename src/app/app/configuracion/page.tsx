@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 import type { AccountingAccountType } from "@prisma/client";
 import type React from "react";
 import { createAccountingAccountAction, updateAccountingAccountAction } from "@/app/app/configuracion/accounting-actions";
@@ -284,12 +285,7 @@ export default async function ConfiguracionPage() {
   return (
     <section className="max-w-6xl">
       <SavedBanner />
-      <div className="border-b border-slate-200 pb-5">
-        <h1 className="text-2xl font-semibold text-adentu-ink">Configuracion</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-          Parametros base de la empresa unica y administracion del plan de cuentas.
-        </p>
-      </div>
+      <PageHeader help="Parametros base de la empresa unica y administracion del plan de cuentas." title="Configuracion" />
       <dl className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[
           ["Empresa", APP_COMPANY_NAME],

@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 import type { AuditAction } from "@prisma/client";
 import { auditActionLabels, movementAuditSummary } from "@/lib/audit-log";
 import { typeLabels } from "@/app/app/movimientos/shared";
@@ -76,12 +77,10 @@ export default async function BitacoraPage({ searchParams }: BitacoraPageProps) 
 
   return (
     <section className="max-w-6xl">
-      <div className="border-b border-slate-200 pb-5">
-        <h1 className="text-2xl font-semibold text-adentu-ink">Bitacora de movimientos</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-          Registro de creaciones, ediciones y eliminaciones de movimientos, con usuario y fecha/hora.
-        </p>
-      </div>
+      <PageHeader
+        help="Registro de creaciones, ediciones y eliminaciones de movimientos, con usuario y fecha/hora."
+        title="Bitacora de movimientos"
+      />
 
       <form className="mt-6 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-4">
         <label className="text-sm">

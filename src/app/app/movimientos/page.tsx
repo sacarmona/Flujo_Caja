@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 import { Prisma } from "@prisma/client";
 import type { MovementStatus, MovementType } from "@prisma/client";
 import { createMovementAction, getMovementDefaults } from "@/app/app/movimientos/actions";
@@ -312,14 +313,10 @@ export default async function MovimientosPage({ searchParams }: MovimientosPageP
   return (
     <section className="max-w-7xl">
       <SavedBanner />
-      <div className="border-b border-slate-200 pb-5">
-        <h1 className="text-2xl font-semibold text-adentu-ink">Movimientos</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          Registro de ingresos y egresos proyectados o reales. La cancelacion conserva el registro para auditoria. La columna
-          &quot;Fecha&quot; corresponde a la fecha proyectada del movimiento; haz clic en &quot;Ver&quot; para el detalle completo,
-          pagos y otros campos.
-        </p>
-      </div>
+      <PageHeader
+        help='Registro de ingresos y egresos proyectados o reales. La cancelacion conserva el registro para auditoria. La columna "Fecha" corresponde a la fecha proyectada del movimiento; haz clic en "Ver" para el detalle completo, pagos y otros campos.'
+        title="Movimientos"
+      />
 
       <form className="mt-6 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-9">
         {query ? <input name="q" type="hidden" value={query} /> : null}

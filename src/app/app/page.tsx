@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -72,12 +73,10 @@ export default async function AppHomePage({ searchParams }: AppHomePageProps) {
 
   return (
     <section className="max-w-5xl">
-      <div className="border-b border-slate-200 pb-5">
-        <h1 className="text-2xl font-semibold text-adentu-ink">Resumen de flujo de caja</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-          Vista inicial preparada para consolidar saldos, vencimientos y alertas de caja en CLP.
-        </p>
-      </div>
+      <PageHeader
+        help="Vista inicial preparada para consolidar saldos, vencimientos y alertas de caja en CLP."
+        title="Resumen de flujo de caja"
+      />
       {negativeDay ? (
         <Link
           className="mt-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 transition hover:border-red-300"

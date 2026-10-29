@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { createVendorAction, setVendorActiveAction, updateVendorAction } from "@/app/app/proveedores/actions";
 import { VendorForm } from "@/app/app/proveedores/vendor-form";
@@ -56,13 +57,10 @@ export default async function ProveedoresPage() {
     <section className="max-w-6xl">
       <SavedBanner />
       <ErrorBanner />
-      <div className="border-b border-slate-200 pb-5">
-        <h1 className="text-2xl font-semibold text-adentu-ink">Proveedores</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          Deuda historica por proveedor. El saldo se descuenta automaticamente cuando un movimiento de Egreso vinculado pasa a
-          Parcial o Pagado/Cobrado.
-        </p>
-      </div>
+      <PageHeader
+        help="Deuda historica por proveedor. El saldo se descuenta automaticamente cuando un movimiento de Egreso vinculado pasa a Parcial o Pagado/Cobrado."
+        title="Proveedores"
+      />
 
       {canManage ? (
         <details className="mt-8 group">

@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
 import type { MovementType, RecurrenceFrequency } from "@prisma/client";
 import {
@@ -144,12 +145,10 @@ export default async function RecurrentesPage({ searchParams }: RecurrentesPageP
   return (
     <section className="max-w-7xl">
       <SavedBanner />
-      <div className="border-b border-slate-200 pb-5">
-        <h1 className="text-2xl font-semibold text-adentu-ink">Recurrentes</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          Reglas para generar movimientos proyectados. Las fechas no habiles se mueven al dia habil siguiente.
-        </p>
-      </div>
+      <PageHeader
+        help="Reglas para generar movimientos proyectados. Las fechas no habiles se mueven al dia habil siguiente."
+        title="Recurrentes"
+      />
 
       <form className="mt-6 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-7">
         <label className="text-sm">

@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
 import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, CheckCircle2, CircleDot, Download, WalletCards } from "lucide-react";
 import type { MovementStatus, MovementType } from "@prisma/client";
@@ -119,12 +120,10 @@ export default async function CalendarioPage({ searchParams }: CalendarioPagePro
   return (
     <section className="max-w-none">
       <SavedBanner />
-      <div className="border-b border-slate-200 pb-5">
-        <h1 className="text-2xl font-semibold text-adentu-ink">Calendario</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          Vista de flujo por dia habil basada en el motor de caja. Las celdas abren Movimientos filtrados por fecha y cuenta.
-        </p>
-      </div>
+      <PageHeader
+        help="Vista de flujo por dia habil basada en el motor de caja. Las celdas abren Movimientos filtrados por fecha y cuenta."
+        title="Calendario"
+      />
 
       {lateMovementsCount > 0 ? (
         <Link

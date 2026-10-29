@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 import { getCurrentUser } from "@/lib/auth";
 import { accountMatchesMovementType } from "@/lib/movements";
 import { prisma } from "@/lib/prisma";
@@ -92,13 +93,10 @@ export default async function ConciliacionPage() {
     <section className="max-w-5xl space-y-8">
       <SavedBanner />
       <ErrorBanner />
-      <div className="border-b border-slate-200 pb-5">
-        <h1 className="text-2xl font-semibold tracking-normal text-adentu-ink">Conciliacion bancaria</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          Sube la cartola de la cuenta corriente (copiada/pegada o descargada directo del banco, ambos formatos se reconocen automaticamente) para
-          revisar los movimientos de la semana, confirmar los que ya estan registrados como Pagado/Cobrado y crear los que falten.
-        </p>
-      </div>
+      <PageHeader
+        help="Sube la cartola de la cuenta corriente (copiada/pegada o descargada directo del banco, ambos formatos se reconocen automaticamente) para revisar los movimientos de la semana, confirmar los que ya estan registrados como Pagado/Cobrado y crear los que falten."
+        title="Conciliacion bancaria"
+      />
 
       {!canManage ? (
         <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
