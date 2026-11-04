@@ -76,19 +76,20 @@ model Company {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  accountingAccounts AccountingAccount[]
-  auditLogs          AuditLog[]
-  bankAccounts       BankAccount[]
-  bankImportBatches  BankImportBatch[]
-  businessUnits      BusinessUnit[]
-  costCenters        CostCenter[]
-  exchangeRates      ExchangeRate[]
-  movements          Movement[]
-  openingBalances    OpeningBalance[]
-  projects           Project[]
-  recurrenceRules    RecurrenceRule[]
-  users              User[]
-  vendors            Vendor[]
+  accountingAccounts    AccountingAccount[]
+  accountingDescriptors AccountingDescriptor[]
+  auditLogs             AuditLog[]
+  bankAccounts          BankAccount[]
+  bankImportBatches     BankImportBatch[]
+  businessUnits         BusinessUnit[]
+  costCenters           CostCenter[]
+  exchangeRates         ExchangeRate[]
+  movements             Movement[]
+  openingBalances       OpeningBalance[]
+  projects              Project[]
+  recurrenceRules       RecurrenceRule[]
+  users                 User[]
+  vendors               Vendor[]
 }
 
 model User {
@@ -192,15 +193,36 @@ model AccountingAccount {
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
-  children        AccountingAccount[] @relation("AccountingAccountHierarchy")
-  company         Company             @relation(fields: [companyId], references: [id])
+  children        AccountingAccount[]    @relation("AccountingAccountHierarchy")
+  company         Company                @relation(fields: [companyId], references: [id])
+  descriptors     AccountingDescriptor[]
   movements       Movement[]
   recurrenceRules RecurrenceRule[]
-  parent          AccountingAccount?  @relation("AccountingAccountHierarchy", fields: [parentId], references: [id])
+  parent          AccountingAccount?     @relation("AccountingAccountHierarchy", fields: [parentId], references: [id])
 
   @@unique([companyId, code])
   @@index([companyId])
   @@index([parentId])
+}
+
+/// Descriptor validado: texto que, si aparece en la descripcion de un movimiento
+/// de la cartola, sugiere una cuenta contable pre-asignada en Conciliacion.
+model AccountingDescriptor {
+  id                  String    @id @default(cuid())
+  companyId           String
+  pattern             String
+  accountingAccountId String
+  isActive            Boolean   @default(true)
+  deletedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  accountingAccount AccountingAccount @relation(fields: [accountingAccountId], references: [id])
+  company           Company           @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, pattern])
+  @@index([companyId])
+  @@index([accountingAccountId])
 }
 
 model BankAccount {

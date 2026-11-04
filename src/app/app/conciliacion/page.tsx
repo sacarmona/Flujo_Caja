@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/page-header";
+import { proposeDescriptorPattern, suggestAccountForDescription } from "@/lib/accounting-descriptors";
 import { getCurrentUser } from "@/lib/auth";
 import { accountMatchesMovementType } from "@/lib/movements";
 import { prisma } from "@/lib/prisma";
@@ -6,7 +7,9 @@ import { canManageReconciliation, matchBankRow, movementTypeForBankType } from "
 import {
   cancelImportBatchAction,
   confirmReconciliationAction,
+  createDescriptorAction,
   createMovementFromBankRowAction,
+  deactivateDescriptorAction,
   discardBankMovementAction,
   loadCandidates,
   reverseReconciliationAction,
@@ -83,6 +86,13 @@ export default async function ConciliacionPage() {
   }
 
   const referenceData = canManage ? await getReferenceData(user.companyId) : null;
+  const descriptors = canManage
+    ? await prisma.accountingDescriptor.findMany({
+        where: { companyId: user.companyId, isActive: true, deletedAt: null },
+        include: { accountingAccount: true },
+        orderBy: [{ pattern: "asc" }]
+      })
+    : [];
 
   const isRowResolved = (row: { reconciliations: { confirmed: boolean; reversed: boolean }[] }) =>
     row.reconciliations.some((reconciliation) => reconciliation.confirmed || reconciliation.reversed);
@@ -124,6 +134,64 @@ export default async function ConciliacionPage() {
         </form>
       )}
 
+      {canManage && referenceData ? (
+        <details className="rounded-lg border border-slate-200 bg-white p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-adentu-ink">
+            Descriptores y cuenta contable sugerida ({descriptors.length})
+          </summary>
+          <p className="mt-2 text-xs text-slate-600">
+            Si la descripcion de un movimiento de la cartola contiene el descriptor (palabras completas, sin importar tildes ni mayusculas),
+            Conciliacion sugiere su cuenta contable al crear el movimiento. Si varios coinciden, gana el mas especifico (mas largo).
+          </p>
+          <form action={createDescriptorAction} className="mt-3 flex flex-wrap items-end gap-2">
+            <label className="text-xs">
+              <span className="mb-1 block text-slate-600">Descriptor</span>
+              <input className="w-56 rounded-md border border-slate-300 px-2 py-1.5 text-sm" minLength={3} name="pattern" placeholder="ej. pago en linea copec" required />
+            </label>
+            <label className="text-xs">
+              <span className="mb-1 block text-slate-600">Cuenta contable</span>
+              <select className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" name="accountingAccountId" required>
+                {referenceData.accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {optionLabel(account.code, account.name)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="rounded-md bg-adentu-blue px-3 py-1.5 text-xs font-semibold text-white" type="submit">
+              Agregar descriptor
+            </button>
+          </form>
+          {descriptors.length > 0 ? (
+            <table className="mt-3 w-full text-left text-sm">
+              <thead className="text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="py-1 font-medium">Descriptor</th>
+                  <th className="py-1 font-medium">Cuenta contable</th>
+                  <th className="py-1" />
+                </tr>
+              </thead>
+              <tbody>
+                {descriptors.map((descriptor) => (
+                  <tr className="border-t border-slate-100" key={descriptor.id}>
+                    <td className="py-1.5 font-medium text-adentu-ink">{descriptor.pattern}</td>
+                    <td className="py-1.5 text-slate-600">{optionLabel(descriptor.accountingAccount.code, descriptor.accountingAccount.name)}</td>
+                    <td className="py-1.5 text-right">
+                      <form action={deactivateDescriptorAction}>
+                        <input name="descriptorId" type="hidden" value={descriptor.id} />
+                        <button className="text-xs font-semibold text-slate-500 underline hover:text-red-700" type="submit">
+                          Quitar
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : null}
+        </details>
+      ) : null}
+
       {!latestBatch ? (
         <p className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">
           Aun no se ha importado ninguna cartola.
@@ -150,6 +218,11 @@ export default async function ConciliacionPage() {
               const live = matchBankRow(row, candidates);
               const expectedType = movementTypeForBankType(row.type);
               const matchingAccounts = referenceData?.accounts.filter((account) => accountMatchesMovementType(account.type, expectedType)) ?? [];
+              const suggestion = suggestAccountForDescription(
+                row.description ?? "",
+                descriptors.map((descriptor) => ({ pattern: descriptor.pattern, accountingAccountId: descriptor.accountingAccountId })),
+                (accountId) => matchingAccounts.some((account) => account.id === accountId)
+              );
               const splitCandidates = candidates.filter((candidate) => candidate.type === expectedType);
               const reconciliationId = row.reconciliations[0]?.id;
 
@@ -226,13 +299,19 @@ export default async function ConciliacionPage() {
                           <input name="reconciliationId" type="hidden" value={reconciliationId} />
                           <label className="text-xs">
                             <span className="mb-1 block text-slate-600">Cuenta contable</span>
-                            <select className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm" name="accountingAccountId" required>
+                            <select
+                              className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                              defaultValue={suggestion?.accountingAccountId}
+                              name="accountingAccountId"
+                              required
+                            >
                               {matchingAccounts.map((account) => (
                                 <option key={account.id} value={account.id}>
                                   {optionLabel(account.code, account.name)}
                                 </option>
                               ))}
                             </select>
+                            {suggestion ? <span className="mt-1 block text-emerald-700">Sugerida por descriptor &ldquo;{suggestion.pattern}&rdquo;</span> : null}
                           </label>
                           <label className="text-xs">
                             <span className="mb-1 block text-slate-600">Unidad de negocio</span>
@@ -266,6 +345,18 @@ export default async function ConciliacionPage() {
                               ))}
                             </select>
                           </label>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 sm:col-span-2">
+                            <label className="inline-flex items-center gap-1.5">
+                              <input defaultChecked={!suggestion} name="saveDescriptor" type="checkbox" />
+                              Recordar descriptor
+                            </label>
+                            <input
+                              aria-label="Descriptor a recordar"
+                              className="w-56 rounded-md border border-slate-300 px-2 py-1 text-sm"
+                              defaultValue={suggestion?.pattern ?? proposeDescriptorPattern(row.description ?? "")}
+                              name="descriptorPattern"
+                            />
+                          </div>
                           <div className="sm:col-span-2">
                             <button className="rounded-md bg-adentu-blue px-3 py-1.5 text-xs font-semibold text-white" type="submit">
                               Crear y marcar Pagado/Cobrado

@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import type { MovementType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { parseBankStatementFile, type BankStatementRawRow } from "@/lib/bank-statement-import";
+import { normalizeDescriptor } from "@/lib/accounting-descriptors";
 import { todayInAppTimeZone } from "@/lib/format";
 import { mondayOfWeek } from "@/lib/calendar-view";
 import { parseRequiredDate, validateMovementInput, type MovementFormInput } from "@/lib/movements";
@@ -402,6 +403,91 @@ export async function splitReconciliationAction(formData: FormData) {
   await redirectSaved("/app/conciliacion");
 }
 
+/**
+ * Guarda (o reactiva) un descriptor validado: el texto queda normalizado
+ * (sin tildes/mayusculas) para que no existan duplicados por escritura.
+ */
+async function saveDescriptor(
+  tx: Prisma.TransactionClient,
+  user: { id: string; companyId: string },
+  rawPattern: string,
+  accountingAccountId: string
+) {
+  const pattern = normalizeDescriptor(rawPattern);
+  if (pattern.length < 3) {
+    throw new Error("El descriptor debe tener al menos 3 letras o numeros.");
+  }
+
+  const account = await tx.accountingAccount.findFirst({
+    where: { id: accountingAccountId, companyId: user.companyId, isActive: true, deletedAt: null, children: { none: {} } }
+  });
+  if (!account) {
+    throw new Error("La cuenta contable del descriptor no existe o no admite movimientos.");
+  }
+
+  const existing = await tx.accountingDescriptor.findUnique({ where: { companyId_pattern: { companyId: user.companyId, pattern } } });
+  const descriptor = await tx.accountingDescriptor.upsert({
+    where: { companyId_pattern: { companyId: user.companyId, pattern } },
+    create: { companyId: user.companyId, pattern, accountingAccountId },
+    update: { accountingAccountId, isActive: true, deletedAt: null }
+  });
+  await tx.auditLog.create({
+    data: {
+      companyId: user.companyId,
+      userId: user.id,
+      entity: "AccountingDescriptor",
+      entityId: descriptor.id,
+      action: existing ? "UPDATE" : "CREATE",
+      before: existing ? JSON.parse(JSON.stringify(existing)) : undefined,
+      after: JSON.parse(JSON.stringify(descriptor)),
+      metadata: { source: "conciliacion" }
+    }
+  });
+}
+
+export async function createDescriptorAction(formData: FormData) {
+  const user = await requireReconciliationManager();
+  try {
+    await prisma.$transaction((tx) => saveDescriptor(tx, user, stringValue(formData, "pattern"), stringValue(formData, "accountingAccountId")));
+  } catch (error) {
+    return redirectWithError("/app/conciliacion", error instanceof Error ? error.message : "No se pudo guardar el descriptor.");
+  }
+
+  revalidatePath("/app/conciliacion");
+  await redirectSaved("/app/conciliacion");
+}
+
+export async function deactivateDescriptorAction(formData: FormData) {
+  const user = await requireReconciliationManager();
+  const id = stringValue(formData, "descriptorId");
+  try {
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.accountingDescriptor.findFirst({ where: { id, companyId: user.companyId, isActive: true } });
+      if (!existing) {
+        throw new Error("El descriptor no existe o ya fue desactivado.");
+      }
+      const updated = await tx.accountingDescriptor.update({ where: { id }, data: { isActive: false, deletedAt: new Date() } });
+      await tx.auditLog.create({
+        data: {
+          companyId: user.companyId,
+          userId: user.id,
+          entity: "AccountingDescriptor",
+          entityId: id,
+          action: "SOFT_DELETE",
+          before: JSON.parse(JSON.stringify(existing)),
+          after: JSON.parse(JSON.stringify(updated)),
+          metadata: { source: "conciliacion" }
+        }
+      });
+    });
+  } catch (error) {
+    return redirectWithError("/app/conciliacion", error instanceof Error ? error.message : "No se pudo desactivar el descriptor.");
+  }
+
+  revalidatePath("/app/conciliacion");
+  await redirectSaved("/app/conciliacion");
+}
+
 export async function createMovementFromBankRowAction(formData: FormData) {
   const user = await requireReconciliationManager();
   const reconciliationId = stringValue(formData, "reconciliationId");
@@ -491,6 +577,10 @@ export async function createMovementFromBankRowAction(formData: FormData) {
         where: { id: reconciliation.id },
         data: { movementId: movement.id, paymentId: payment.id, confirmed: true, confirmedById: user.id, confirmedAt: new Date() }
       });
+
+      if (formData.get("saveDescriptor") === "on") {
+        await saveDescriptor(tx, user, stringValue(formData, "descriptorPattern"), accountingAccountId);
+      }
     }, { timeout: 60000, maxWait: 10000 });
   } catch (error) {
     return redirectWithError("/app/conciliacion", error instanceof Error ? error.message : "No se pudo crear el movimiento.");
