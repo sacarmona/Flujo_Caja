@@ -457,6 +457,61 @@ export async function createDescriptorAction(formData: FormData) {
   await redirectSaved("/app/conciliacion");
 }
 
+export async function updateDescriptorAction(formData: FormData) {
+  const user = await requireReconciliationManager();
+  const id = stringValue(formData, "descriptorId");
+  const pattern = normalizeDescriptor(stringValue(formData, "pattern"));
+  const accountingAccountId = stringValue(formData, "accountingAccountId");
+
+  try {
+    if (pattern.length < 3) {
+      throw new Error("El descriptor debe tener al menos 3 letras o numeros.");
+    }
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.accountingDescriptor.findFirst({ where: { id, companyId: user.companyId, isActive: true } });
+      if (!existing) {
+        throw new Error("El descriptor no existe o fue desactivado.");
+      }
+      const account = await tx.accountingAccount.findFirst({
+        where: { id: accountingAccountId, companyId: user.companyId, isActive: true, deletedAt: null, children: { none: {} } }
+      });
+      if (!account) {
+        throw new Error("La cuenta contable no existe o no admite movimientos.");
+      }
+      const clash = await tx.accountingDescriptor.findFirst({
+        where: { companyId: user.companyId, pattern, isActive: true, NOT: { id } }
+      });
+      if (clash) {
+        throw new Error(`Ya existe otro descriptor "${pattern}".`);
+      }
+
+      // Un descriptor desactivado con el mismo texto se conserva (sin borrar), renombrado, para respetar el unico (empresa, texto).
+      const inactive = await tx.accountingDescriptor.findFirst({ where: { companyId: user.companyId, pattern, isActive: false, NOT: { id } } });
+      if (inactive) {
+        await tx.accountingDescriptor.update({ where: { id: inactive.id }, data: { pattern: `${pattern} (baja ${inactive.id})` } });
+      }
+      const updated = await tx.accountingDescriptor.update({ where: { id }, data: { pattern, accountingAccountId } });
+      await tx.auditLog.create({
+        data: {
+          companyId: user.companyId,
+          userId: user.id,
+          entity: "AccountingDescriptor",
+          entityId: id,
+          action: "UPDATE",
+          before: JSON.parse(JSON.stringify(existing)),
+          after: JSON.parse(JSON.stringify(updated)),
+          metadata: { source: "conciliacion" }
+        }
+      });
+    });
+  } catch (error) {
+    return redirectWithError("/app/conciliacion", error instanceof Error ? error.message : "No se pudo actualizar el descriptor.");
+  }
+
+  revalidatePath("/app/conciliacion");
+  await redirectSaved("/app/conciliacion");
+}
+
 export async function deactivateDescriptorAction(formData: FormData) {
   const user = await requireReconciliationManager();
   const id = stringValue(formData, "descriptorId");

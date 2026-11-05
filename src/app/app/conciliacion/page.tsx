@@ -12,6 +12,7 @@ import {
   deactivateDescriptorAction,
   discardBankMovementAction,
   loadCandidates,
+  updateDescriptorAction,
   reverseReconciliationAction,
   uploadBankStatementAction
 } from "./actions";
@@ -174,10 +175,40 @@ export default async function ConciliacionPage() {
               <tbody>
                 {descriptors.map((descriptor) => (
                   <tr className="border-t border-slate-100" key={descriptor.id}>
-                    <td className="py-1.5 font-medium text-adentu-ink">{descriptor.pattern}</td>
-                    <td className="py-1.5 text-slate-600">{optionLabel(descriptor.accountingAccount.code, descriptor.accountingAccount.name)}</td>
-                    <td className="py-1.5 text-right">
-                      <form action={deactivateDescriptorAction}>
+                    <td className="py-1.5 pr-2">
+                      <input
+                        aria-label={`Descriptor ${descriptor.pattern}`}
+                        className="w-full min-w-40 rounded-md border border-slate-300 px-2 py-1 text-sm"
+                        defaultValue={descriptor.pattern}
+                        form={`descriptor-${descriptor.id}`}
+                        minLength={3}
+                        name="pattern"
+                        required
+                      />
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      <select
+                        aria-label={`Cuenta contable de ${descriptor.pattern}`}
+                        className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                        defaultValue={descriptor.accountingAccountId}
+                        form={`descriptor-${descriptor.id}`}
+                        name="accountingAccountId"
+                      >
+                        {referenceData.accounts.map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {optionLabel(account.code, account.name)}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="whitespace-nowrap py-1.5 text-right">
+                      <form action={updateDescriptorAction} className="inline" id={`descriptor-${descriptor.id}`}>
+                        <input name="descriptorId" type="hidden" value={descriptor.id} />
+                        <button className="mr-3 text-xs font-semibold text-adentu-blue underline" type="submit">
+                          Guardar
+                        </button>
+                      </form>
+                      <form action={deactivateDescriptorAction} className="inline">
                         <input name="descriptorId" type="hidden" value={descriptor.id} />
                         <button className="text-xs font-semibold text-slate-500 underline hover:text-red-700" type="submit">
                           Quitar
