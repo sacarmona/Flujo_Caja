@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { accountMatchesMovementType } from "@/lib/movements";
 import { prisma } from "@/lib/prisma";
 import { canManageReconciliation, matchBankRow, movementTypeForBankType } from "@/lib/reconciliation";
+import { BulkReconcileBar } from "./bulk-reconcile-bar";
 import {
   cancelImportBatchAction,
   confirmReconciliationAction,
@@ -48,7 +49,8 @@ async function getReferenceData(companyId: string) {
   return { accounts, businessUnits, projects, costCenters };
 }
 
-export default async function ConciliacionPage() {
+export default async function ConciliacionPage({ searchParams }: { searchParams: Promise<{ bulk?: string; bulkError?: string }> }) {
+  const { bulk, bulkError } = await searchParams;
   const user = await getCurrentUser();
   if (!user) {
     return null;
@@ -98,12 +100,21 @@ export default async function ConciliacionPage() {
   const isRowResolved = (row: { reconciliations: { confirmed: boolean; reversed: boolean }[] }) =>
     row.reconciliations.some((reconciliation) => reconciliation.confirmed || reconciliation.reversed);
   const pendingRows = (latestBatch?.bankMovements ?? []).filter((row) => !isRowResolved(row));
+  const bulkParts = bulk?.split("-").map(Number);
+  const bulkResult = bulkParts && bulkParts.length === 3 && bulkParts.every(Number.isFinite) ? bulkParts : null;
   const resolvedRows = (latestBatch?.bankMovements ?? []).filter(isRowResolved);
 
   return (
     <section className="max-w-5xl space-y-8">
       <SavedBanner />
       <ErrorBanner />
+      {bulkResult ? (
+        <div className="rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm text-emerald-800" role="status">
+          Conciliacion masiva: {bulkResult[0]} fila(s) conciliada(s).
+          {bulkResult[1] > 0 ? ` ${bulkResult[1]} no se pudieron procesar y siguen pendientes${bulkError ? ` (primer error: ${bulkError})` : ""}.` : ""}
+          {bulkResult[2] > 0 ? ` ${bulkResult[2]} no alcanzaron a procesarse: vuelve a pulsar el boton.` : ""}
+        </div>
+      ) : null}
       <PageHeader
         help="Sube la cartola de la cuenta corriente (copiada/pegada o descargada directo del banco, ambos formatos se reconocen automaticamente) para revisar los movimientos de la semana, confirmar los que ya estan registrados como Pagado/Cobrado y crear los que falten."
         title="Conciliacion bancaria"
@@ -235,12 +246,15 @@ export default async function ConciliacionPage() {
               Pendientes por revisar: {pendingRows.length}. Ya conciliadas: {resolvedRows.length}.
             </p>
             {canManage && pendingRows.length > 0 ? (
-              <form action={cancelImportBatchAction}>
-                <input name="batchId" type="hidden" value={latestBatch.id} />
-                <button className="rounded-md border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50" type="submit">
-                  Cancelar importacion completa ({pendingRows.length} fila{pendingRows.length === 1 ? "" : "s"} pendiente{pendingRows.length === 1 ? "" : "s"})
-                </button>
-              </form>
+              <div className="flex flex-wrap items-center gap-2">
+                <form action={cancelImportBatchAction}>
+                  <input name="batchId" type="hidden" value={latestBatch.id} />
+                  <button className="rounded-md border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50" type="submit">
+                    Cancelar importacion completa ({pendingRows.length} fila{pendingRows.length === 1 ? "" : "s"} pendiente{pendingRows.length === 1 ? "" : "s"})
+                  </button>
+                </form>
+                <BulkReconcileBar />
+              </div>
             ) : null}
           </div>
 
@@ -258,7 +272,7 @@ export default async function ConciliacionPage() {
               const reconciliationId = row.reconciliations[0]?.id;
 
               return (
-                <div className="rounded-lg border border-slate-200 bg-white p-4" key={row.id}>
+                <div className="rounded-lg border border-slate-200 bg-white p-4" data-bulk-row key={row.id}>
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-adentu-ink">{row.description || "(sin descripcion)"}</p>
@@ -267,6 +281,12 @@ export default async function ConciliacionPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
+                      {canManage ? (
+                        <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-slate-600">
+                          <input data-bulk-include defaultChecked={live.matchLevel === "HIGH"} type="checkbox" />
+                          Incluir en masiva
+                        </label>
+                      ) : null}
                       <p className={`text-sm font-semibold ${row.type === "CARGO" ? "text-red-700" : "text-emerald-700"}`}>
                         {formatCurrency(Number(row.amount))}
                       </p>
@@ -287,7 +307,7 @@ export default async function ConciliacionPage() {
                         Coincide con: <strong>{live.candidates[0]?.description}</strong> ({formatDate(live.candidates[0]?.projectedDate ?? row.date)})
                       </p>
                       {canManage ? (
-                        <form action={confirmReconciliationAction}>
+                        <form action={confirmReconciliationAction} data-bulk-form>
                           <input name="reconciliationId" type="hidden" value={reconciliationId} />
                           <input name="movementId" type="hidden" value={live.movementId} />
                           <button className="rounded-md bg-adentu-teal px-3 py-1.5 text-xs font-semibold text-white" type="submit">
@@ -302,7 +322,7 @@ export default async function ConciliacionPage() {
                     <div className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
                       <p className="mb-2">Hay {live.candidates.length} movimiento(s) con el mismo monto pendiente, pero la fecha no coincide exacto. Elige cual corresponde:</p>
                       {canManage ? (
-                        <form action={confirmReconciliationAction} className="flex flex-wrap items-end gap-2">
+                        <form action={confirmReconciliationAction} className="flex flex-wrap items-end gap-2" data-bulk-form>
                           <input name="reconciliationId" type="hidden" value={reconciliationId} />
                           <select className="rounded-md border border-amber-300 px-2 py-1.5 text-sm" defaultValue={live.movementId ?? ""} name="movementId" required>
                             <option disabled value="">
@@ -326,7 +346,7 @@ export default async function ConciliacionPage() {
                     <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-700">
                       <p className="mb-2">No existe ningun movimiento pendiente con ese monto. Crealo y quedara directamente Pagado/Cobrado.</p>
                       {canManage && referenceData ? (
-                        <form action={createMovementFromBankRowAction} className="grid gap-2 sm:grid-cols-2">
+                        <form action={createMovementFromBankRowAction} className="grid gap-2 sm:grid-cols-2" data-bulk-form>
                           <input name="reconciliationId" type="hidden" value={reconciliationId} />
                           <label className="text-xs">
                             <span className="mb-1 block text-slate-600">Cuenta contable</span>

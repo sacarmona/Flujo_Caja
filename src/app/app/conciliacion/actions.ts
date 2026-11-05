@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import type { MovementType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
@@ -276,41 +277,49 @@ async function registerReconciliationPayment(params: {
   return payment;
 }
 
+/** Confirma una fila de cartola contra un movimiento: registra el pago y marca la conciliacion. */
+async function confirmRowAgainstMovement(
+  tx: Prisma.TransactionClient,
+  user: { id: string; companyId: string },
+  reconciliationId: string,
+  selectedMovementId: string | null
+) {
+  const reconciliation = await tx.reconciliation.findFirst({
+    where: { id: reconciliationId, bankMovement: { bankAccount: { companyId: user.companyId } } },
+    include: { bankMovement: true }
+  });
+  if (!reconciliation || reconciliation.confirmed || reconciliation.reversed) {
+    throw new Error("La conciliacion no existe o ya fue procesada.");
+  }
+
+  const movementId = selectedMovementId ?? reconciliation.movementId;
+  if (!movementId) {
+    throw new Error("Selecciona el movimiento con el que se concilia esta fila del banco.");
+  }
+
+  const payment = await registerReconciliationPayment({
+    tx,
+    userId: user.id,
+    companyId: user.companyId,
+    movementId,
+    amount: reconciliation.bankMovement.amount.abs(),
+    paidAt: reconciliation.bankMovement.date,
+    reference: `Conciliacion banco${reconciliation.bankMovement.reference ? ` - Doc. ${reconciliation.bankMovement.reference}` : ""}`
+  });
+
+  await tx.reconciliation.update({
+    where: { id: reconciliation.id },
+    data: { movementId, paymentId: payment.id, confirmed: true, confirmedById: user.id, confirmedAt: new Date() }
+  });
+}
+
 export async function confirmReconciliationAction(formData: FormData) {
   const user = await requireReconciliationManager();
   const reconciliationId = stringValue(formData, "reconciliationId");
   const selectedMovementId = optionalStringValue(formData, "movementId");
 
   try {
-    await prisma.$transaction(async (tx) => {
-      const reconciliation = await tx.reconciliation.findFirst({
-        where: { id: reconciliationId, bankMovement: { bankAccount: { companyId: user.companyId } } },
-        include: { bankMovement: true }
-      });
-      if (!reconciliation || reconciliation.confirmed || reconciliation.reversed) {
-        throw new Error("La conciliacion no existe o ya fue procesada.");
-      }
-
-      const movementId = selectedMovementId ?? reconciliation.movementId;
-      if (!movementId) {
-        throw new Error("Selecciona el movimiento con el que se concilia esta fila del banco.");
-      }
-
-      const payment = await registerReconciliationPayment({
-        tx,
-        userId: user.id,
-        companyId: user.companyId,
-        movementId,
-        amount: reconciliation.bankMovement.amount.abs(),
-        paidAt: reconciliation.bankMovement.date,
-        reference: `Conciliacion banco${reconciliation.bankMovement.reference ? ` - Doc. ${reconciliation.bankMovement.reference}` : ""}`
-      });
-
-      await tx.reconciliation.update({
-        where: { id: reconciliation.id },
-        data: { movementId, paymentId: payment.id, confirmed: true, confirmedById: user.id, confirmedAt: new Date() }
-      });
-    }, { timeout: 60000, maxWait: 10000 });
+    await prisma.$transaction((tx) => confirmRowAgainstMovement(tx, user, reconciliationId, selectedMovementId), { timeout: 60000, maxWait: 10000 });
   } catch (error) {
     return redirectWithError("/app/conciliacion", error instanceof Error ? error.message : "No se pudo confirmar la conciliacion.");
   }
@@ -543,100 +552,104 @@ export async function deactivateDescriptorAction(formData: FormData) {
   await redirectSaved("/app/conciliacion");
 }
 
-export async function createMovementFromBankRowAction(formData: FormData) {
-  const user = await requireReconciliationManager();
+/** Crea el movimiento de una fila de cartola sin coincidencia y lo deja Pagado/Cobrado, con los datos de formData. */
+async function createMovementFromBankRow(tx: Prisma.TransactionClient, user: { id: string; companyId: string }, formData: FormData) {
   const reconciliationId = stringValue(formData, "reconciliationId");
   const accountingAccountId = stringValue(formData, "accountingAccountId");
   const businessUnitId = stringValue(formData, "businessUnitId");
   const projectId = optionalStringValue(formData, "projectId");
   const costCenterId = optionalStringValue(formData, "costCenterId");
 
+  const reconciliation = await tx.reconciliation.findFirst({
+    where: { id: reconciliationId, bankMovement: { bankAccount: { companyId: user.companyId } } },
+    include: { bankMovement: true }
+  });
+  if (!reconciliation || reconciliation.confirmed || reconciliation.reversed) {
+    throw new Error("La conciliacion no existe o ya fue procesada.");
+  }
+
+  const bankMovement = reconciliation.bankMovement;
+  const type: MovementType = movementTypeForBankType(bankMovement.type);
+  const projectedDateText = bankMovement.date.toISOString().slice(0, 10);
+
+  const input: MovementFormInput = {
+    type,
+    accountingAccountId,
+    description: bankMovement.description || "Movimiento importado desde cartola bancaria",
+    amount: bankMovement.amount.abs().toString(),
+    currency: "CLP",
+    manualRate: null,
+    manualRateReason: null,
+    bankAccountId: bankMovement.bankAccountId,
+    businessUnitId,
+    projectId,
+    costCenterId,
+    vendorId: null,
+    projectedDate: projectedDateText,
+    realDate: projectedDateText,
+    status: "PENDING",
+    notes: "Creado desde Conciliacion bancaria."
+  };
+
+  const [accountingAccount, bankAccount, businessUnit, project, costCenter] = await Promise.all([
+    tx.accountingAccount.findFirst({ where: { id: accountingAccountId, companyId: user.companyId }, include: { _count: { select: { children: true } } } }),
+    tx.bankAccount.findFirst({ where: { id: bankMovement.bankAccountId, companyId: user.companyId } }),
+    tx.businessUnit.findFirst({ where: { id: businessUnitId, companyId: user.companyId } }),
+    projectId ? tx.project.findFirst({ where: { id: projectId, companyId: user.companyId } }) : Promise.resolve(null),
+    costCenterId ? tx.costCenter.findFirst({ where: { id: costCenterId, companyId: user.companyId } }) : Promise.resolve(null)
+  ]);
+
+  const data = validateMovementInput(input, { accountingAccount, bankAccount, businessUnit, project, costCenter });
+  const movement = await tx.movement.create({
+    data: {
+      companyId: user.companyId,
+      ...data,
+      currency: "CLP",
+      conversionDate: parseRequiredDate(projectedDateText),
+      projectedRate: new Prisma.Decimal(1),
+      projectedAmountClp: data.amount,
+      exchangeRateSource: "CLP",
+      isManualRate: false
+    }
+  });
+
+  await tx.auditLog.create({
+    data: {
+      companyId: user.companyId,
+      userId: user.id,
+      entity: "Movement",
+      entityId: movement.id,
+      action: "CREATE",
+      after: JSON.parse(JSON.stringify(movement)),
+      metadata: { source: "conciliacion" }
+    }
+  });
+
+  const payment = await registerReconciliationPayment({
+    tx,
+    userId: user.id,
+    companyId: user.companyId,
+    movementId: movement.id,
+    amount: bankMovement.amount.abs(),
+    paidAt: bankMovement.date,
+    reference: `Conciliacion banco${bankMovement.reference ? ` - Doc. ${bankMovement.reference}` : ""}`
+  });
+
+  await tx.reconciliation.update({
+    where: { id: reconciliation.id },
+    data: { movementId: movement.id, paymentId: payment.id, confirmed: true, confirmedById: user.id, confirmedAt: new Date() }
+  });
+
+  if (formData.get("saveDescriptor") === "on") {
+    await saveDescriptor(tx, user, stringValue(formData, "descriptorPattern"), accountingAccountId);
+  }
+}
+
+export async function createMovementFromBankRowAction(formData: FormData) {
+  const user = await requireReconciliationManager();
+
   try {
-    await prisma.$transaction(async (tx) => {
-      const reconciliation = await tx.reconciliation.findFirst({
-        where: { id: reconciliationId, bankMovement: { bankAccount: { companyId: user.companyId } } },
-        include: { bankMovement: true }
-      });
-      if (!reconciliation || reconciliation.confirmed || reconciliation.reversed) {
-        throw new Error("La conciliacion no existe o ya fue procesada.");
-      }
-
-      const bankMovement = reconciliation.bankMovement;
-      const type: MovementType = movementTypeForBankType(bankMovement.type);
-      const projectedDateText = bankMovement.date.toISOString().slice(0, 10);
-
-      const input: MovementFormInput = {
-        type,
-        accountingAccountId,
-        description: bankMovement.description || "Movimiento importado desde cartola bancaria",
-        amount: bankMovement.amount.abs().toString(),
-        currency: "CLP",
-        manualRate: null,
-        manualRateReason: null,
-        bankAccountId: bankMovement.bankAccountId,
-        businessUnitId,
-        projectId,
-        costCenterId,
-        vendorId: null,
-        projectedDate: projectedDateText,
-        realDate: projectedDateText,
-        status: "PENDING",
-        notes: "Creado desde Conciliacion bancaria."
-      };
-
-      const [accountingAccount, bankAccount, businessUnit, project, costCenter] = await Promise.all([
-        tx.accountingAccount.findFirst({ where: { id: accountingAccountId, companyId: user.companyId }, include: { _count: { select: { children: true } } } }),
-        tx.bankAccount.findFirst({ where: { id: bankMovement.bankAccountId, companyId: user.companyId } }),
-        tx.businessUnit.findFirst({ where: { id: businessUnitId, companyId: user.companyId } }),
-        projectId ? tx.project.findFirst({ where: { id: projectId, companyId: user.companyId } }) : Promise.resolve(null),
-        costCenterId ? tx.costCenter.findFirst({ where: { id: costCenterId, companyId: user.companyId } }) : Promise.resolve(null)
-      ]);
-
-      const data = validateMovementInput(input, { accountingAccount, bankAccount, businessUnit, project, costCenter });
-      const movement = await tx.movement.create({
-        data: {
-          companyId: user.companyId,
-          ...data,
-          currency: "CLP",
-          conversionDate: parseRequiredDate(projectedDateText),
-          projectedRate: new Prisma.Decimal(1),
-          projectedAmountClp: data.amount,
-          exchangeRateSource: "CLP",
-          isManualRate: false
-        }
-      });
-
-      await tx.auditLog.create({
-        data: {
-          companyId: user.companyId,
-          userId: user.id,
-          entity: "Movement",
-          entityId: movement.id,
-          action: "CREATE",
-          after: JSON.parse(JSON.stringify(movement)),
-          metadata: { source: "conciliacion" }
-        }
-      });
-
-      const payment = await registerReconciliationPayment({
-        tx,
-        userId: user.id,
-        companyId: user.companyId,
-        movementId: movement.id,
-        amount: bankMovement.amount.abs(),
-        paidAt: bankMovement.date,
-        reference: `Conciliacion banco${bankMovement.reference ? ` - Doc. ${bankMovement.reference}` : ""}`
-      });
-
-      await tx.reconciliation.update({
-        where: { id: reconciliation.id },
-        data: { movementId: movement.id, paymentId: payment.id, confirmed: true, confirmedById: user.id, confirmedAt: new Date() }
-      });
-
-      if (formData.get("saveDescriptor") === "on") {
-        await saveDescriptor(tx, user, stringValue(formData, "descriptorPattern"), accountingAccountId);
-      }
-    }, { timeout: 60000, maxWait: 10000 });
+    await prisma.$transaction((tx) => createMovementFromBankRow(tx, user, formData), { timeout: 60000, maxWait: 10000 });
   } catch (error) {
     return redirectWithError("/app/conciliacion", error instanceof Error ? error.message : "No se pudo crear el movimiento.");
   }
@@ -644,6 +657,65 @@ export async function createMovementFromBankRowAction(formData: FormData) {
   revalidatePath("/app/conciliacion");
   revalidatePath("/app/movimientos");
   await redirectSaved("/app/conciliacion");
+}
+
+/** Tiempo maximo de la conciliacion masiva; el resto queda pendiente para otra pasada (maxDuration de la pagina: 60 s). */
+const BULK_TIME_BUDGET_MS = 40_000;
+
+export type BulkRowInput = Record<string, string>;
+
+/**
+ * Conciliacion masiva: el usuario deja listas las filas de la cartola en la
+ * pagina (movimiento elegido, o cuenta contable/unidad de negocio para crear)
+ * y marca las que quiere procesar; el navegador envia los valores actuales de
+ * cada fila. Segun los campos presentes, la fila se concilia contra un
+ * movimiento existente (movementId) o se crea uno nuevo (accountingAccountId).
+ * Cada fila va en su propia transaccion: un fallo aislado no aborta el resto.
+ * Los permisos y la pertenencia a la empresa se validan aqui, en el servidor.
+ */
+export async function bulkReconcileAction(rows: BulkRowInput[]) {
+  const user = await requireReconciliationManager();
+  const startedAt = Date.now();
+  const usedMovementIds = new Set<string>();
+  let done = 0;
+  let failed = 0;
+  let remaining = 0;
+  let firstError = "";
+
+  for (const [index, row] of rows.entries()) {
+    if (Date.now() - startedAt > BULK_TIME_BUDGET_MS) {
+      remaining = rows.length - index;
+      break;
+    }
+    const formData = new FormData();
+    Object.entries(row).forEach(([key, value]) => formData.set(key, String(value)));
+    const reconciliationId = stringValue(formData, "reconciliationId");
+    const movementId = optionalStringValue(formData, "movementId");
+
+    try {
+      if (movementId) {
+        if (usedMovementIds.has(movementId)) {
+          throw new Error("El movimiento ya se uso en otra fila de esta pasada.");
+        }
+        await prisma.$transaction((tx) => confirmRowAgainstMovement(tx, user, reconciliationId, movementId), { timeout: 20000, maxWait: 10000 });
+        usedMovementIds.add(movementId);
+      } else if (stringValue(formData, "accountingAccountId")) {
+        await prisma.$transaction((tx) => createMovementFromBankRow(tx, user, formData), { timeout: 30000, maxWait: 10000 });
+      } else {
+        throw new Error("La fila no tiene un movimiento elegido ni cuenta contable.");
+      }
+      done += 1;
+    } catch (error) {
+      failed += 1;
+      firstError ||= error instanceof Error ? error.message : "Error desconocido.";
+    }
+  }
+
+  revalidatePath("/app/conciliacion");
+  revalidatePath("/app/movimientos");
+  const query = new URLSearchParams({ bulk: `${done}-${failed}-${remaining}` });
+  if (firstError) query.set("bulkError", firstError);
+  redirect(`/app/conciliacion?${query.toString()}`);
 }
 
 export async function reverseReconciliationAction(formData: FormData) {
