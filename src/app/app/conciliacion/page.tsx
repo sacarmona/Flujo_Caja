@@ -20,7 +20,8 @@ import {
 import { optionLabel } from "../movimientos/shared";
 import { ErrorBanner } from "@/components/error-banner";
 import { SavedBanner } from "@/components/saved-banner";
-import { formatCurrency } from "@/lib/format";
+import { mondayOfWeek } from "@/lib/calendar-view";
+import { formatCurrency, todayInAppTimeZone } from "@/lib/format";
 import { SplitReconciliationForm } from "./split-reconciliation-form";
 
 /**
@@ -57,6 +58,9 @@ export default async function ConciliacionPage({ searchParams }: { searchParams:
   }
 
   const canManage = canManageReconciliation(user.role);
+  // Por defecto, el lunes de la semana en curso; se puede retroceder para recuperar movimientos sin conciliar.
+  const weekStart = mondayOfWeek(todayInAppTimeZone());
+  const defaultFrom = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, "0")}-${String(weekStart.getDate()).padStart(2, "0")}`;
   const bankAccounts = await prisma.bankAccount.findMany({
     where: { companyId: user.companyId, isActive: true, deletedAt: null },
     orderBy: [{ name: "asc" }]
@@ -135,6 +139,10 @@ export default async function ConciliacionPage({ searchParams }: { searchParams:
                 </option>
               ))}
             </select>
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-slate-600">Desde</span>
+            <input className="rounded-md border border-slate-300 px-2 py-2 text-sm" defaultValue={defaultFrom} name="from" required type="date" />
           </label>
           <label className="text-sm">
             <span className="mb-1 block text-slate-600">Cartola (XLSX, copiada o descargada del banco)</span>

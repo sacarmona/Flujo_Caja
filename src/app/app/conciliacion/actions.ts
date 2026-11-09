@@ -120,21 +120,39 @@ export async function uploadBankStatementAction(formData: FormData) {
     }
 
     /**
-     * No se concilian semanas anteriores a la actual: si el saldo inicial de
-     * esas semanas ya quedo actualizado, sus movimientos no necesitan
-     * revisarse de nuevo aunque vengan incluidos en la cartola (que suele
-     * traer varios dias o semanas previas). Las semanas futuras SI se
+     * Por defecto no se concilian semanas anteriores a la actual: si el saldo
+     * inicial de esas semanas ya quedo actualizado, sus movimientos no
+     * necesitan revisarse de nuevo aunque vengan incluidos en la cartola (que
+     * suele traer varios dias o semanas previas). El campo "Desde" permite
+     * retroceder esa fecha para recuperar movimientos que quedaron sin
+     * conciliar (ej. un cargo del viernes que se revisa el lunes); las filas
+     * ya conciliadas se siguen omitiendo. Las semanas futuras SI se
      * concilian: el banco puede liquidar movimientos "contablemente" de la
      * semana siguiente antes de que esa semana comience (ej. el viernes
      * 26/6 ya aparecen cargos con fecha 30/6), y no hay razon para
      * bloquearlos solo por eso.
      */
+    const fromText = stringValue(formData, "from");
+    if (fromText && !/^\d{4}-\d{2}-\d{2}$/.test(fromText)) {
+      return redirectWithError("/app/conciliacion", "La fecha \"Desde\" no es valida.");
+    }
+    const fromDate = fromText ? new Date(`${fromText}T00:00:00.000Z`) : null;
+    if (fromDate && Number.isNaN(fromDate.getTime())) {
+      return redirectWithError("/app/conciliacion", "La fecha \"Desde\" no es valida.");
+    }
     const currentWeekStart = mondayOfWeek(todayInAppTimeZone());
-    const currentWeekRows = parsedRows.filter((row) => mondayOfWeek(row.date) >= currentWeekStart);
+    const currentWeekRows = fromDate
+      ? parsedRows.filter((row) => row.date.getTime() >= fromDate.getTime())
+      : parsedRows.filter((row) => mondayOfWeek(row.date) >= currentWeekStart);
     const skippedOldWeeks = parsedRows.length - currentWeekRows.length;
 
     if (currentWeekRows.length === 0) {
-      return redirectWithError("/app/conciliacion", "La cartola no tiene movimientos de la semana en curso o posteriores (todos son de semanas anteriores).");
+      return redirectWithError(
+        "/app/conciliacion",
+        fromDate
+          ? "La cartola no tiene movimientos desde la fecha indicada."
+          : "La cartola no tiene movimientos de la semana en curso o posteriores (todos son de semanas anteriores). Usa el campo Desde para incluir fechas anteriores."
+      );
     }
 
     const confirmedRows = await loadConfirmedBankRows(user.companyId, bankAccountId, currentWeekRows);
@@ -144,12 +162,12 @@ export async function uploadBankStatementAction(formData: FormData) {
     if (rawRows.length === 0) {
       return redirectWithError(
         "/app/conciliacion",
-        "Todos los movimientos de la semana en curso de esta cartola ya fueron conciliados en una importacion anterior."
+        "Todos los movimientos del periodo de esta cartola ya fueron conciliados en una importacion anterior."
       );
     }
 
     skipNotes = [
-      skippedOldWeeks > 0 ? `${skippedOldWeeks} de semanas anteriores` : null,
+      skippedOldWeeks > 0 ? `${skippedOldWeeks} anteriores a la fecha Desde` : null,
       partitioned.alreadyReconciledCount > 0 ? `${partitioned.alreadyReconciledCount} ya conciliados` : null
     ].filter((note): note is string => note !== null);
   } catch (error) {
